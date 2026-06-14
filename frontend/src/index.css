@@ -1,0 +1,189 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Merriweather:wght@400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+    margin: 0;
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+    font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
+
+@layer base {
+    :root {
+        /* Veteran Passage — Archway Gradient Palette */
+        --background: 240 10% 98%;
+        --foreground: 210 30% 14%;
+
+        /* Primary: Deep Navy (from "Veteran" wordmark) */
+        --primary: 210 35% 22%;
+        --primary-foreground: 0 0% 100%;
+        --primary-light: 210 30% 35%;
+        --primary-dark: 210 40% 15%;
+
+        /* Secondary: Passage Purple */
+        --secondary: 280 55% 42%;
+        --secondary-foreground: 0 0% 100%;
+        --secondary-light: 280 50% 58%;
+
+        /* Accent: Sunrise Orange */
+        --accent: 30 90% 55%;
+        --accent-foreground: 0 0% 100%;
+
+        /* Ember: Coral warm */
+        --ember: 10 78% 56%;
+        --ember-foreground: 0 0% 100%;
+
+        /* Neutral Tones */
+        --muted: 240 8% 93%;
+        --muted-foreground: 210 12% 45%;
+
+        --card: 0 0% 100%;
+        --card-foreground: 210 30% 14%;
+
+        --popover: 0 0% 100%;
+        --popover-foreground: 210 30% 14%;
+
+        --border: 240 10% 88%;
+        --input: 240 10% 88%;
+        --ring: 280 55% 42%;
+
+        /* State Colors */
+        --destructive: 0 70% 55%;
+        --destructive-foreground: 0 0% 100%;
+        --success: 150 50% 40%;
+        --warning: 38 90% 55%;
+
+        /* Logo Gradient (Orange → Coral → Purple) */
+        --gradient-hero: linear-gradient(135deg, hsl(30 90% 55%) 0%, hsl(350 70% 55%) 50%, hsl(280 55% 42%) 100%);
+        --gradient-subtle: linear-gradient(180deg, hsl(240 10% 98%) 0%, hsl(270 15% 96%) 100%);
+        --gradient-card: linear-gradient(135deg, hsl(0 0% 100%) 0%, hsl(270 12% 97%) 100%);
+        --gradient-arch: linear-gradient(180deg, #F5A623 0%, #E74C3C 45%, #8E44AD 100%);
+
+        /* Shadows */
+        --shadow-sm: 0 2px 8px hsl(280 55% 42% / 0.06);
+        --shadow-md: 0 4px 16px hsl(280 55% 42% / 0.10);
+        --shadow-lg: 0 8px 32px hsl(280 55% 42% / 0.14);
+        --shadow-glow: 0 0 40px hsl(280 50% 58% / 0.25);
+
+        /* Animations */
+        --transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        --transition-bounce: 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+        /* Border Radius */
+        --radius: 1rem;
+        --radius-sm: 0.5rem;
+        --radius-lg: 1.5rem;
+        --radius-full: 9999px;
+    }
+
+    .dark {
+        --background: 240 15% 10%;
+        --foreground: 240 10% 95%;
+
+        --primary: 210 35% 55%;
+        --primary-foreground: 0 0% 100%;
+
+        --secondary: 280 50% 55%;
+        --secondary-foreground: 0 0% 100%;
+
+        --accent: 30 85% 58%;
+        --accent-foreground: 0 0% 100%;
+
+        --muted: 240 15% 18%;
+        --muted-foreground: 240 10% 62%;
+
+        --card: 240 14% 13%;
+        --card-foreground: 240 10% 95%;
+
+        --popover: 240 14% 13%;
+        --popover-foreground: 240 10% 95%;
+
+        --border: 240 15% 22%;
+        --input: 240 15% 22%;
+        --ring: 280 50% 55%;
+
+        --destructive: 0 65% 50%;
+        --destructive-foreground: 0 0% 100%;
+    }
+
+    /* Kindling Mode — for OTH/BCD discharge users */
+    .theme-kindling {
+        --primary: 30 90% 48%;
+        --primary-foreground: 0 0% 100%;
+        --ring: 30 90% 48%;
+        --gradient-hero: linear-gradient(135deg, hsl(30 90% 55%) 0%, hsl(10 78% 56%) 50%, hsl(350 65% 48%) 100%);
+        --shadow-glow: 0 0 40px hsl(30 80% 55% / 0.3);
+    }
+}
+
+@layer base {
+    * {
+        @apply border-border;
+    }
+    body {
+        @apply bg-background text-foreground;
+    }
+    h1, h2, h3 {
+        font-family: 'Merriweather', serif;
+    }
+}
+
+/* Custom Utilities */
+@layer utilities {
+    .gradient-hero {
+        background: var(--gradient-hero);
+    }
+    .gradient-subtle {
+        background: var(--gradient-subtle);
+    }
+    .gradient-arch {
+        background: var(--gradient-arch);
+    }
+    .shadow-elegant {
+        box-shadow: var(--shadow-md);
+    }
+    .shadow-glow {
+        box-shadow: var(--shadow-glow);
+    }
+    .transition-smooth {
+        transition: var(--transition-smooth);
+    }
+    .text-gradient {
+        background: var(--gradient-arch);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+}
+
+button:focus-visible {
+    outline: none;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+}
+
+::-webkit-scrollbar-thumb {
+    background: hsl(var(--secondary) / 0.4);
+    border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--secondary) / 0.6);
+}

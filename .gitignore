@@ -1,0 +1,74 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Environment and secrets
+.env
+.env.*
+*.env
+credentials.json
+*credentials.json*
+*token.json*
+*.pem
+*.key
+.credentials
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+venv/
+.venv/
+
+# Test and generated reports
+test_reports/
+coverage/
+
+# Local/runtime artifacts
+memory/
+conversations/
+bash_events/
+.emergent/
+.openhands/
+project/
+logs/
+*.log
+test_result.md
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+dump.rdb
+
+# Build output and caches
+build/
+dist/
+.cache/
+.next/
+out/
+*.tsbuildinfo
+.yarn-cache/
+.yarn/install-state.gz
+
+# Local tool/system files
+.DS_Store
+.idea/
+.vscode/
+.ipynb_checkpoints/
+.ac
+.chainlit
+chainlit.md
+.vercel/
+
+# Archives and binary packages
+*.zip
+*.tar.gz
+*.tar
+*.tgz
+*.pack
+*.deb
+*.dylib
+
+# Corrupt repository backup
+.git_corrupt_backup/
+.gitconfig
