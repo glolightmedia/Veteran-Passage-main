@@ -4,11 +4,12 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
+import secrets
 from datetime import datetime, timezone
 
 from routes.auth import router as auth_router, set_db as set_auth_db
@@ -34,6 +35,7 @@ from routes.events import router as events_router, set_db as set_events_db
 from routes.link_health import router as link_health_router, set_db as set_link_health_db
 from routes.blog import router as blog_router, set_db as set_blog_db
 from utils.auth import hash_password, verify_password
+from utils.audit import log_audit_event
 
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
@@ -76,7 +78,7 @@ class CustomCORSMiddleware(BaseHTTPMiddleware):
             response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Credentials"] = "true"
             response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
-            response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-API-Key, X-Origin-URL"
+            response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-API-Key, X-Origin-URL, X-Bootstrap-Token"
             response.headers["Access-Control-Max-Age"] = "600"
 
         return response
@@ -119,16 +121,56 @@ async def health_check():
 
 @app.post("/api/dev/create-admin")
 async def dev_create_admin(request: Request):
-    body = await request.json()
+    async def audit(success: bool, reason: str, email: str = None):
+        await log_audit_event(
+            db,
+            request=request,
+            action="dev_create_admin_attempt",
+            metadata={"reason": reason, "email": email},
+            success=success,
+        )
+
+    if os.environ.get("ENVIRONMENT", "").strip().lower() != "development":
+        await audit(False, "environment_disabled")
+        raise HTTPException(status_code=403, detail="Bootstrap disabled")
+
+    if os.environ.get("ENABLE_DEV_ADMIN_BOOTSTRAP", "").strip().lower() != "true":
+        await audit(False, "bootstrap_not_enabled")
+        raise HTTPException(status_code=403, detail="Bootstrap disabled")
+
+    expected_token = os.environ.get("BOOTSTRAP_ADMIN_TOKEN", "")
+    provided_token = request.headers.get("X-Bootstrap-Token", "")
+    if not expected_token:
+        await audit(False, "missing_bootstrap_token_env")
+        raise HTTPException(status_code=403, detail="Bootstrap disabled")
+
+    if not provided_token or not secrets.compare_digest(provided_token, expected_token):
+        await audit(False, "invalid_bootstrap_token")
+        raise HTTPException(status_code=403, detail="Bootstrap disabled")
+
+    try:
+        body = await request.json()
+    except Exception:
+        await audit(False, "invalid_json")
+        raise HTTPException(status_code=400, detail="Invalid request")
+
     email = body.get("email", "").lower().strip()
     password = body.get("password", "")
     if not email or not password or len(password) < 6:
-        from fastapi import HTTPException
+        await audit(False, "invalid_email_or_password", email)
         raise HTTPException(status_code=400, detail="Email and password (min 6) required")
+
+    allow_recovery = os.environ.get("ALLOW_SUPERADMIN_RECOVERY", "").strip().lower() == "true"
+    superadmin_exists = await db.users.find_one({"role": "superadmin"}, {"_id": 1})
+    if superadmin_exists and not allow_recovery:
+        await audit(False, "superadmin_already_exists", email)
+        raise HTTPException(status_code=409, detail="SuperAdmin already exists")
+
     existing = await db.users.find_one({"email": email})
     if existing:
         await db.users.update_one({"email": email}, {"$set": {"role": "superadmin", "password_hash": hash_password(password)}})
-        return {"message": f"User {email} upgraded to superadmin"}
+        await audit(True, "existing_user_upgraded", email)
+        return {"message": "SuperAdmin bootstrap completed"}
     await db.users.insert_one({
         "email": email, "password_hash": hash_password(password),
         "full_name": "Admin", "role": "superadmin",
@@ -136,7 +178,8 @@ async def dev_create_admin(request: Request):
         "saved_resources": [], "intake_completed": True,
         "created_at": datetime.now(timezone.utc).isoformat()
     })
-    return {"message": f"Superadmin created: {email}"}
+    await audit(True, "superadmin_created", email)
+    return {"message": "SuperAdmin bootstrap completed"}
 
 
 @app.post("/api/webhook/stripe")

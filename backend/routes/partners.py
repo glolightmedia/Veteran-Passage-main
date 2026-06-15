@@ -5,6 +5,7 @@ import logging
 
 from utils.auth import get_current_user
 from utils.rbac import require_role
+from utils.audit import log_audit_event
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/partners", tags=["partners"])
@@ -100,15 +101,31 @@ async def approve_application(request: Request, app_id: str):
         "created_at": datetime.now(timezone.utc).isoformat()
     })
 
+    await log_audit_event(
+        db,
+        request=request,
+        action="partner_application_approved",
+        actor_id=admin["id"],
+        target_id=app_id,
+        metadata={"organization_name": app["organization_name"], "partner_type": app["partner_type"]},
+    )
+
     return {"message": "Application approved and added to partner directory"}
 
 
 @router.put("/applications/{app_id}/reject")
 async def reject_application(request: Request, app_id: str):
-    await require_role(request, db, ["admin"])
+    admin = await require_role(request, db, ["admin"])
     await db.partner_applications.update_one(
         {"_id": ObjectId(app_id)},
         {"$set": {"status": "rejected", "rejected_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    await log_audit_event(
+        db,
+        request=request,
+        action="partner_application_rejected",
+        actor_id=admin["id"],
+        target_id=app_id,
     )
     return {"message": "Application rejected"}
 

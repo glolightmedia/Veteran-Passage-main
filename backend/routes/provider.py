@@ -25,7 +25,7 @@ def set_db(database):
 
 @router.get("/resources")
 async def list_own_resources(request: Request):
-    user = await require_role(request, db, ["provider", "admin"])
+    user = await require_role(request, db, ["partner", "admin"])
     query = {"provider_id": user["id"]} if user.get("role") != "admin" else {}
     cursor = db.resources.find(query).sort("created_at", -1)
     resources = []
@@ -37,7 +37,7 @@ async def list_own_resources(request: Request):
 
 @router.post("/resources")
 async def create_resource(request: Request, data: ResourceCreate):
-    user = await require_role(request, db, ["provider", "admin"])
+    user = await require_role(request, db, ["partner", "admin"])
     doc = {
         "name": data.name,
         "description": data.description,
@@ -63,7 +63,7 @@ async def create_resource(request: Request, data: ResourceCreate):
 
 @router.put("/resources/{resource_id}")
 async def update_resource(request: Request, resource_id: str, data: ResourceUpdate):
-    user = await require_role(request, db, ["provider", "admin"])
+    user = await require_role(request, db, ["partner", "admin"])
     resource = await db.resources.find_one({"_id": ObjectId(resource_id)})
     if not resource:
         raise HTTPException(status_code=404, detail="Resource not found")
@@ -83,7 +83,7 @@ async def update_resource(request: Request, resource_id: str, data: ResourceUpda
 
 @router.delete("/resources/{resource_id}")
 async def delete_resource(request: Request, resource_id: str):
-    user = await require_role(request, db, ["provider", "admin"])
+    user = await require_role(request, db, ["partner", "admin"])
     resource = await db.resources.find_one({"_id": ObjectId(resource_id)})
     if not resource:
         raise HTTPException(status_code=404, detail="Resource not found")
@@ -95,14 +95,14 @@ async def delete_resource(request: Request, resource_id: str):
 
 @router.get("/promotions/plans")
 async def get_promotion_plans(request: Request):
-    await require_role(request, db, ["provider", "admin"])
+    await require_role(request, db, ["partner", "admin"])
     return {"plans": PROMOTION_PLANS}
 
 
 @router.post("/promotions/checkout")
 async def create_promotion_checkout(request: Request, data: PromotionCreate):
     from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionRequest
-    user = await require_role(request, db, ["provider", "admin"])
+    user = await require_role(request, db, ["partner", "admin"])
 
     resource = await db.resources.find_one({"_id": ObjectId(data.resource_id)})
     if not resource:
@@ -161,7 +161,7 @@ async def create_promotion_checkout(request: Request, data: PromotionCreate):
 @router.get("/promotions/status/{session_id}")
 async def check_promotion_status(request: Request, session_id: str):
     from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionRequest
-    user = await require_role(request, db, ["provider", "admin"])
+    user = await require_role(request, db, ["partner", "admin"])
 
     tx = await db.payment_transactions.find_one({"session_id": session_id})
     if not tx:
@@ -216,7 +216,7 @@ async def check_promotion_status(request: Request, session_id: str):
 
 @router.get("/promotions")
 async def list_own_promotions(request: Request):
-    user = await require_role(request, db, ["provider", "admin"])
+    user = await require_role(request, db, ["partner", "admin"])
     query = {"provider_id": user["id"]} if user.get("role") != "admin" else {}
     cursor = db.promotions.find(query).sort("created_at", -1)
     promotions = []
@@ -228,7 +228,7 @@ async def list_own_promotions(request: Request):
 
 @router.get("/analytics")
 async def provider_analytics(request: Request):
-    user = await require_role(request, db, ["provider", "admin"])
+    user = await require_role(request, db, ["partner", "admin"])
     resource_count = await db.resources.count_documents({"provider_id": user["id"]})
     approved_count = await db.resources.count_documents({"provider_id": user["id"], "status": "approved"})
     active_promos = await db.promotions.count_documents({"provider_id": user["id"], "status": "active"})

@@ -4,8 +4,9 @@ from bson import ObjectId
 from typing import Optional
 import logging
 
-from utils.auth import get_current_user, hash_password
-from utils.rbac import require_role
+from utils.auth import hash_password
+from utils.rbac import require_superadmin, ROLES, PARTNER_SUBTYPES, BILLING_PLANS
+from utils.audit import log_audit_event
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/superadmin", tags=["superadmin"])
@@ -17,18 +18,14 @@ def set_db(database):
     db = database
 
 
-async def require_admin(request):
-    user = await get_current_user(request, db)
-    if user.get("role") not in ["admin", "superadmin"]:
-        raise HTTPException(status_code=403, detail="Admin access required")
-    return user
+
 
 
 # ─── BLOG / CONTENT MANAGEMENT ───
 
 @router.get("/blog")
 async def list_blog_posts(request: Request, status: str = Query("all"), page: int = Query(1, ge=1), limit: int = Query(20, ge=1, le=50)):
-    await require_admin(request)
+    await require_superadmin(request, db)
     query = {} if status == "all" else {"status": status}
     skip = (page - 1) * limit
     total = await db.blog_posts.count_documents(query)
@@ -42,7 +39,7 @@ async def list_blog_posts(request: Request, status: str = Query("all"), page: in
 
 @router.post("/blog")
 async def create_blog_post(request: Request):
-    admin = await require_admin(request)
+    admin = await require_superadmin(request, db)
     body = await request.json()
     doc = {
         "title": body.get("title", ""),
@@ -68,7 +65,7 @@ async def create_blog_post(request: Request):
 
 @router.put("/blog/{post_id}")
 async def update_blog_post(request: Request, post_id: str):
-    await require_admin(request)
+    await require_superadmin(request, db)
     body = await request.json()
     update = {k: v for k, v in body.items() if k not in ["id", "_id"]}
     update["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -87,7 +84,7 @@ async def update_blog_post(request: Request, post_id: str):
 
 @router.delete("/blog/{post_id}")
 async def delete_blog_post(request: Request, post_id: str):
-    await require_admin(request)
+    await require_superadmin(request, db)
     result = await db.blog_posts.delete_one({"_id": ObjectId(post_id)})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Post not found")
@@ -98,7 +95,7 @@ async def delete_blog_post(request: Request, post_id: str):
 
 @router.delete("/users/{user_id}")
 async def delete_user(request: Request, user_id: str):
-    admin = await require_admin(request)
+    admin = await require_superadmin(request, db)
     if user_id == admin["id"]:
         raise HTTPException(status_code=400, detail="Cannot delete yourself")
     user = await db.users.find_one({"_id": ObjectId(user_id)})
@@ -110,25 +107,45 @@ async def delete_user(request: Request, user_id: str):
     await db.forum_replies.delete_many({"author_id": user_id})
     await db.mentorship_requests.delete_many({"$or": [{"mentee_id": user_id}, {"mentor_id": user_id}]})
     await db.chat_sessions.delete_many({"user_id": user_id})
-    await db.activity_logs.insert_one({
-        "user_id": admin["id"], "action": "user_deleted",
-        "metadata": {"deleted_user": user.get("email"), "deleted_id": user_id},
-        "created_at": datetime.now(timezone.utc).isoformat()
-    })
+    await log_audit_event(
+        db,
+        request=request,
+        action="user_deleted",
+        actor_id=admin["id"],
+        target_id=user_id,
+        metadata={"deleted_user": user.get("email")},
+    )
     return {"message": f"User {user.get('email')} deleted"}
 
 
 @router.put("/users/{user_id}/edit")
 async def edit_user(request: Request, user_id: str):
-    admin = await require_admin(request)
+    admin = await require_superadmin(request, db)
     body = await request.json()
     allowed = ["full_name", "email", "branch", "discharge", "location", "role", "is_mentor", "mentor_expertise", "mentor_bio"]
     update = {k: v for k, v in body.items() if k in allowed and v is not None}
     if not update:
         raise HTTPException(status_code=400, detail="No valid fields to update")
+    if "role" in update and update["role"] not in ROLES:
+        raise HTTPException(status_code=400, detail=f"Invalid role. Must be: {', '.join(ROLES)}")
+    existing = await db.users.find_one({"_id": ObjectId(user_id)})
+    if not existing:
+        raise HTTPException(status_code=404, detail="User not found")
     update["updated_by"] = admin["id"]
     update["updated_at"] = datetime.now(timezone.utc).isoformat()
     await db.users.update_one({"_id": ObjectId(user_id)}, {"$set": update})
+    await log_audit_event(
+        db,
+        request=request,
+        action="user_edited",
+        actor_id=admin["id"],
+        target_id=user_id,
+        metadata={
+            "fields": sorted(update.keys()),
+            "old_role": existing.get("role"),
+            "new_role": update.get("role", existing.get("role")),
+        },
+    )
     user = await db.users.find_one({"_id": ObjectId(user_id)})
     user["id"] = str(user.pop("_id"))
     user.pop("password_hash", None)
@@ -137,7 +154,7 @@ async def edit_user(request: Request, user_id: str):
 
 @router.post("/users/{user_id}/reset-password")
 async def force_password_reset(request: Request, user_id: str):
-    admin = await require_admin(request)
+    admin = await require_superadmin(request, db)
     body = await request.json()
     new_password = body.get("new_password")
     if not new_password or len(new_password) < 6:
@@ -146,11 +163,13 @@ async def force_password_reset(request: Request, user_id: str):
         {"_id": ObjectId(user_id)},
         {"$set": {"password_hash": hash_password(new_password)}}
     )
-    await db.activity_logs.insert_one({
-        "user_id": admin["id"], "action": "force_password_reset",
-        "metadata": {"target_user_id": user_id},
-        "created_at": datetime.now(timezone.utc).isoformat()
-    })
+    await log_audit_event(
+        db,
+        request=request,
+        action="force_password_reset",
+        actor_id=admin["id"],
+        target_id=user_id,
+    )
     return {"message": "Password reset successfully"}
 
 
@@ -158,11 +177,11 @@ async def force_password_reset(request: Request, user_id: str):
 
 @router.get("/analytics/deep")
 async def deep_analytics(request: Request):
-    await require_admin(request)
+    await require_superadmin(request, db)
 
     total_users = await db.users.count_documents({})
     role_counts = {}
-    for role in ["admin", "moderator", "provider", "developer", "customer"]:
+    for role in ROLES:
         role_counts[role] = await db.users.count_documents({"role": role})
 
     # Signups over last 30 days
@@ -234,7 +253,7 @@ async def deep_analytics(request: Request):
 
 @router.get("/audit-log")
 async def get_audit_log(request: Request, action: str = Query(None), page: int = Query(1, ge=1), limit: int = Query(30, ge=1, le=100)):
-    await require_admin(request)
+    await require_superadmin(request, db)
     query = {}
     if action:
         query["action"] = {"$regex": action, "$options": "i"}
@@ -252,7 +271,7 @@ async def get_audit_log(request: Request, action: str = Query(None), page: int =
 
 @router.get("/announcements")
 async def list_announcements(request: Request):
-    await require_admin(request)
+    await require_superadmin(request, db)
     cursor = db.announcements.find().sort("created_at", -1)
     items = []
     async for a in cursor:
@@ -263,7 +282,7 @@ async def list_announcements(request: Request):
 
 @router.post("/announcements")
 async def create_announcement(request: Request):
-    admin = await require_admin(request)
+    admin = await require_superadmin(request, db)
     body = await request.json()
     doc = {
         "title": body.get("title", ""),
@@ -281,7 +300,7 @@ async def create_announcement(request: Request):
 
 @router.put("/announcements/{ann_id}")
 async def update_announcement(request: Request, ann_id: str):
-    await require_admin(request)
+    await require_superadmin(request, db)
     body = await request.json()
     update = {k: v for k, v in body.items() if k in ["title", "content", "type", "active"]}
     await db.announcements.update_one({"_id": ObjectId(ann_id)}, {"$set": update})
@@ -290,7 +309,7 @@ async def update_announcement(request: Request, ann_id: str):
 
 @router.delete("/announcements/{ann_id}")
 async def delete_announcement(request: Request, ann_id: str):
-    await require_admin(request)
+    await require_superadmin(request, db)
     await db.announcements.delete_one({"_id": ObjectId(ann_id)})
     return {"message": "Deleted"}
 
@@ -299,7 +318,7 @@ async def delete_announcement(request: Request, ann_id: str):
 
 @router.get("/all-jobs")
 async def list_all_jobs(request: Request):
-    await require_admin(request)
+    await require_superadmin(request, db)
     cursor = db.jobs.find().sort("created_at", -1)
     jobs = []
     async for j in cursor:
@@ -311,7 +330,7 @@ async def list_all_jobs(request: Request):
 
 @router.delete("/jobs/{job_id}")
 async def delete_any_job(request: Request, job_id: str):
-    await require_admin(request)
+    await require_superadmin(request, db)
     r1 = await db.jobs.delete_one({"id": job_id})
     if r1.deleted_count == 0:
         r2 = await db.jobs.delete_one({"_id": ObjectId(job_id)})
@@ -322,7 +341,7 @@ async def delete_any_job(request: Request, job_id: str):
 
 @router.get("/all-forum-posts")
 async def list_all_forum_posts(request: Request, page: int = Query(1, ge=1), limit: int = Query(30)):
-    await require_admin(request)
+    await require_superadmin(request, db)
     skip = (page - 1) * limit
     total = await db.forum_posts.count_documents({})
     cursor = db.forum_posts.find().sort("created_at", -1).skip(skip).limit(limit)
@@ -336,7 +355,7 @@ async def list_all_forum_posts(request: Request, page: int = Query(1, ge=1), lim
 
 @router.get("/all-mentorship")
 async def list_all_mentorship(request: Request):
-    await require_admin(request)
+    await require_superadmin(request, db)
     cursor = db.mentorship_requests.find().sort("created_at", -1)
     requests = []
     async for r in cursor:
@@ -347,7 +366,7 @@ async def list_all_mentorship(request: Request):
 
 @router.get("/all-transactions")
 async def list_all_transactions(request: Request):
-    await require_admin(request)
+    await require_superadmin(request, db)
     cursor = db.payment_transactions.find().sort("created_at", -1)
     txns = []
     async for t in cursor:
@@ -358,7 +377,7 @@ async def list_all_transactions(request: Request):
 
 @router.get("/all-api-keys")
 async def list_all_api_keys(request: Request):
-    await require_admin(request)
+    await require_superadmin(request, db)
     cursor = db.api_keys.find().sort("created_at", -1)
     keys = []
     async for k in cursor:
@@ -414,7 +433,7 @@ async def get_active_announcement(request: Request):
 
 @router.get("/leads")
 async def list_leads(request: Request, status: str = Query("new"), category: str = Query(None)):
-    await require_admin(request)
+    await require_superadmin(request, db)
     query = {} if status == "all" else {"status": status}
     if category:
         query["category"] = category
@@ -428,7 +447,7 @@ async def list_leads(request: Request, status: str = Query("new"), category: str
 
 @router.put("/leads/{lead_id}")
 async def update_lead(request: Request, lead_id: str):
-    await require_admin(request)
+    await require_superadmin(request, db)
     body = await request.json()
     update = {k: v for k, v in body.items() if k in ["status", "notes", "assigned_to"]}
     update["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -438,7 +457,7 @@ async def update_lead(request: Request, lead_id: str):
 
 @router.get("/leads/stats")
 async def lead_stats(request: Request):
-    await require_admin(request)
+    await require_superadmin(request, db)
     total = await db.leads.count_documents({})
     new_leads = await db.leads.count_documents({"status": "new"})
     contacted = await db.leads.count_documents({"status": "contacted"})
@@ -452,7 +471,7 @@ async def lead_stats(request: Request):
 
 @router.post("/users/create")
 async def create_user(request: Request):
-    admin = await require_admin(request)
+    admin = await require_superadmin(request, db)
     body = await request.json()
 
     email = body.get("email", "").lower().strip()
@@ -464,7 +483,6 @@ async def create_user(request: Request):
         raise HTTPException(status_code=400, detail="User with this email already exists")
 
     role = body.get("role", "customer")
-    from utils.rbac import ROLES, PARTNER_SUBTYPES
     if role not in ROLES:
         raise HTTPException(status_code=400, detail=f"Invalid role. Must be: {', '.join(ROLES)}")
 
@@ -501,7 +519,6 @@ async def create_user(request: Request):
 
     # Init billing for employer partners
     if role == "partner" and body.get("billing_plan"):
-        from utils.rbac import BILLING_PLANS
         plan = BILLING_PLANS.get(body["billing_plan"])
         if plan:
             await db.subscriptions.insert_one({
@@ -516,12 +533,14 @@ async def create_user(request: Request):
                 "expires_at": (datetime.now(timezone.utc) + timedelta(days=plan["duration_days"])).isoformat()
             })
 
-    await db.activity_logs.insert_one({
-        "user_id": admin["id"],
-        "action": "user_created",
-        "metadata": {"created_user_id": user_id, "email": email, "role": role, "partner_subtype": partner_subtype},
-        "created_at": datetime.now(timezone.utc).isoformat()
-    })
+    await log_audit_event(
+        db,
+        request=request,
+        action="user_created",
+        actor_id=admin["id"],
+        target_id=user_id,
+        metadata={"email": email, "role": role, "partner_subtype": partner_subtype},
+    )
 
     return {"message": f"User created: {email} ({role})", "id": user_id, "email": email, "role": role}
 
@@ -530,14 +549,13 @@ async def create_user(request: Request):
 
 @router.get("/billing/plans")
 async def get_billing_plans(request: Request):
-    await require_admin(request)
-    from utils.rbac import BILLING_PLANS
+    await require_superadmin(request, db)
     return {"plans": BILLING_PLANS}
 
 
 @router.get("/billing/subscriptions")
 async def list_subscriptions(request: Request):
-    await require_admin(request)
+    await require_superadmin(request, db)
     cursor = db.subscriptions.find().sort("started_at", -1)
     subs = []
     async for s in cursor:
@@ -555,7 +573,7 @@ async def list_subscriptions(request: Request):
 
 @router.get("/security/auth-events")
 async def get_auth_events(request: Request, hours: int = Query(24)):
-    await require_admin(request)
+    await require_superadmin(request, db)
     since = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
 
     failed_logins = await db.auth_events.count_documents({"type": "login_failed", "created_at": {"$gte": since}})
@@ -591,7 +609,7 @@ async def get_auth_events(request: Request, hours: int = Query(24)):
 
 @router.get("/widgets")
 async def get_dashboard_widgets(request: Request):
-    await require_admin(request)
+    await require_superadmin(request, db)
     now = datetime.now(timezone.utc)
     today_start = now.replace(hour=0, minute=0, second=0).isoformat()
     last_24h = (now - timedelta(hours=24)).isoformat()

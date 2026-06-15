@@ -5,7 +5,7 @@ from datetime import datetime
 
 # Admin models
 class UpdateUserRole(BaseModel):
-    role: str = Field(..., pattern="^(admin|moderator|provider|developer|customer)$")
+    role: str = Field(..., pattern="^(superadmin|admin|moderator|partner|support_agent|developer|customer)$")
 
 
 class SuspendUser(BaseModel):

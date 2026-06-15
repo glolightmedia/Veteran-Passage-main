@@ -3,7 +3,8 @@ from datetime import datetime, timezone
 from bson import ObjectId
 import logging
 
-from utils.rbac import require_role
+from utils.rbac import ROLES, require_role
+from utils.audit import log_audit_event
 from models.roles import UpdateUserRole, SuspendUser
 
 logger = logging.getLogger(__name__)
@@ -65,18 +66,25 @@ async def update_user_role(request: Request, user_id: str, data: UpdateUserRole)
     if str(user["_id"]) == admin["id"]:
         raise HTTPException(status_code=400, detail="Cannot change your own role")
 
+    if data.role == "superadmin" and admin.get("role") != "superadmin":
+        raise HTTPException(status_code=403, detail="Only SuperAdmin can assign SuperAdmin")
+
+    if user.get("role") == "superadmin" and admin.get("role") != "superadmin":
+        raise HTTPException(status_code=403, detail="Only SuperAdmin can modify SuperAdmin users")
+
     await db.users.update_one(
         {"_id": ObjectId(user_id)},
         {"$set": {"role": data.role, "role_updated_at": datetime.now(timezone.utc).isoformat()}}
     )
 
-    await db.activity_logs.insert_one({
-        "actor_id": admin["id"],
-        "action": "role_change",
-        "target_id": user_id,
-        "metadata": {"old_role": user.get("role", "customer"), "new_role": data.role},
-        "created_at": datetime.now(timezone.utc).isoformat()
-    })
+    await log_audit_event(
+        db,
+        request=request,
+        action="role_change",
+        actor_id=admin["id"],
+        target_id=user_id,
+        metadata={"old_role": user.get("role", "customer"), "new_role": data.role},
+    )
 
     return {"message": f"User role updated to {data.role}"}
 
@@ -92,6 +100,14 @@ async def suspend_user(request: Request, user_id: str, data: SuspendUser):
         {"_id": ObjectId(user_id)},
         {"$set": {"suspended": data.suspended, "suspend_reason": data.reason, "suspended_at": datetime.now(timezone.utc).isoformat()}}
     )
+    await log_audit_event(
+        db,
+        request=request,
+        action="user_suspension_changed",
+        actor_id=admin["id"],
+        target_id=user_id,
+        metadata={"suspended": data.suspended, "reason": data.reason},
+    )
     action = "suspended" if data.suspended else "unsuspended"
     return {"message": f"User {action}"}
 
@@ -102,7 +118,7 @@ async def get_analytics(request: Request):
 
     total_users = await db.users.count_documents({})
     role_counts = {}
-    for role in ["admin", "moderator", "provider", "developer", "customer"]:
+    for role in ROLES:
         role_counts[role] = await db.users.count_documents({"role": role})
 
     total_resources = await db.resources.count_documents({})

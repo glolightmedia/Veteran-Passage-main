@@ -90,6 +90,13 @@ async def require_role(request: Request, db, roles: list) -> dict:
     return user
 
 
+async def require_superadmin(request: Request, db) -> dict:
+    user = await get_current_user(request, db)
+    if user.get("role") != "superadmin":
+        raise HTTPException(status_code=403, detail="SuperAdmin access required")
+    return user
+
+
 async def require_permission(request: Request, db, permission: str) -> dict:
     user = await get_current_user(request, db)
     user_role = user.get("role", "customer")

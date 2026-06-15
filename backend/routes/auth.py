@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException, Request, Response
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from bson import ObjectId
 import logging
+import os
 
 from models.auth import UserRegister, UserLogin, UserUpdate, ForgotPasswordRequest, ResetPasswordRequest
 from utils.auth import (
@@ -25,17 +26,39 @@ def set_db(database):
     db = database
 
 
-def set_auth_cookies(response: Response, access_token: str, refresh_token: str):
+def _truthy_env(name: str, default: bool = False) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() == "true"
+
+
+def get_auth_cookie_options() -> dict:
+    environment = os.environ.get("ENVIRONMENT", "development").strip().lower()
+    secure = _truthy_env("COOKIE_SECURE", environment == "production")
+    samesite = os.environ.get("COOKIE_SAMESITE", "none" if secure else "lax").strip().lower()
+    if samesite == "none" and not secure:
+        samesite = "lax"
+    return {"httponly": True, "secure": secure, "samesite": samesite, "path": "/"}
+
+
+def set_access_cookie(response: Response, access_token: str):
     response.set_cookie(
         key="access_token", value=access_token,
-        httponly=True, secure=True, samesite="none",
-        max_age=3600, path="/"
+        max_age=3600, **get_auth_cookie_options()
     )
+
+
+def set_refresh_cookie(response: Response, refresh_token: str):
     response.set_cookie(
         key="refresh_token", value=refresh_token,
-        httponly=True, secure=True, samesite="none",
-        max_age=604800, path="/"
+        max_age=604800, **get_auth_cookie_options()
     )
+
+
+def set_auth_cookies(response: Response, access_token: str, refresh_token: str):
+    set_access_cookie(response, access_token)
+    set_refresh_cookie(response, refresh_token)
 
 
 def sanitize_user(user: dict) -> dict:
@@ -63,7 +86,7 @@ async def record_failed_attempt(identifier: str):
         new_attempts = record.get("attempts", 0) + 1
         update = {"$set": {"attempts": new_attempts, "last_attempt": datetime.now(timezone.utc)}}
         if new_attempts >= 5:
-            update["$set"]["lockout_until"] = datetime.now(timezone.utc) + __import__("datetime").timedelta(minutes=15)
+            update["$set"]["lockout_until"] = datetime.now(timezone.utc) + timedelta(minutes=15)
         await db.login_attempts.update_one({"identifier": identifier}, update)
     else:
         await db.login_attempts.insert_one({
@@ -158,8 +181,9 @@ async def login(data: UserLogin, request: Request, response: Response):
 
 @router.post("/logout")
 async def logout(response: Response):
-    response.delete_cookie("access_token", path="/")
-    response.delete_cookie("refresh_token", path="/")
+    cookie_options = get_auth_cookie_options()
+    response.delete_cookie("access_token", path="/", secure=cookie_options["secure"], samesite=cookie_options["samesite"])
+    response.delete_cookie("refresh_token", path="/", secure=cookie_options["secure"], samesite=cookie_options["samesite"])
     return {"message": "Logged out successfully"}
 
 
@@ -182,14 +206,12 @@ async def refresh_token(request: Request, response: Response):
         user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
+        if user.get("suspended"):
+            raise HTTPException(status_code=403, detail="Account suspended. Contact support.")
 
         user_id = str(user["_id"])
         new_access = create_access_token(user_id, user["email"])
-        response.set_cookie(
-            key="access_token", value=new_access,
-            httponly=True, secure=False, samesite="lax",
-            max_age=3600, path="/"
-        )
+        set_access_cookie(response, new_access)
         return {"message": "Token refreshed"}
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Refresh token expired")
@@ -226,7 +248,7 @@ async def forgot_password(data: ForgotPasswordRequest):
         "token": token,
         "user_id": str(user["_id"]),
         "email": email,
-        "expires_at": datetime.now(timezone.utc) + __import__("datetime").timedelta(hours=1),
+        "expires_at": datetime.now(timezone.utc) + timedelta(hours=1),
         "used": False
     })
     logger.info(f"Password reset link: /reset-password?token={token}")

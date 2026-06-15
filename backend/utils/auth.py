@@ -57,6 +57,8 @@ async def get_current_user(request: Request, db) -> dict:
         user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
+        if user.get("suspended"):
+            raise HTTPException(status_code=403, detail="Account suspended. Contact support.")
         user["id"] = str(user.pop("_id"))
         user.pop("password_hash", None)
         return user

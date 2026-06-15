@@ -172,7 +172,7 @@ async def list_jobs(
 
 @router.post("")
 async def create_job(request: Request):
-    user = await require_role(request, db, ["provider", "admin"])
+    user = await require_role(request, db, ["partner", "admin"])
     body = await request.json()
 
     required = ["title", "company", "summary", "category"]
@@ -205,7 +205,7 @@ async def create_job(request: Request):
 
 @router.delete("/{job_id}")
 async def delete_job(request: Request, job_id: str):
-    user = await require_role(request, db, ["provider", "admin"])
+    user = await require_role(request, db, ["partner", "admin"])
     result = await db.jobs_v2.delete_one({"_id": ObjectId(job_id), "provider_id": user["id"]})
     if result.deleted_count == 0:
         if user.get("role") == "admin":
