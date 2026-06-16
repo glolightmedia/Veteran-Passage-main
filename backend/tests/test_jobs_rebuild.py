@@ -11,7 +11,7 @@ BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 
 # Test credentials
 OTH_USER = {"email": "testvet@test.com", "password": "TestPass123"}
-ADMIN_USER = {"email": "glolightmedia@gmail.com", "password": "M@rinecorp1"}
+ADMIN_USER = {"email": os.environ.get("SUPERADMIN_EMAIL", "glolightmedia@gmail.com"), "password": os.environ.get("SUPERADMIN_PASSWORD", "")}
 
 
 class TestJobsEndpoints:

@@ -10,8 +10,8 @@ BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 
 # Test credentials
 OTH_VETERAN = {"email": "testvet@test.com", "password": "TestPass123"}  # discharge: oth = yellow tier
-ADMIN = {"email": "admin@veteranpassage.org", "password": "VetPass2026!"}
-SUPERADMIN = {"email": "glolightmedia@gmail.com", "password": "M@rinecorp1"}
+ADMIN = {"email": "admin@veteranpassage.org", "password": os.environ.get("ADMIN_PASSWORD", "")}
+SUPERADMIN = {"email": os.environ.get("SUPERADMIN_EMAIL", "glolightmedia@gmail.com"), "password": os.environ.get("SUPERADMIN_PASSWORD", "")}
 
 
 class TestTriageMyTier:

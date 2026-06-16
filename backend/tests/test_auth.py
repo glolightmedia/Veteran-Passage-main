@@ -12,7 +12,7 @@ BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 
 # Test credentials from /app/memory/test_credentials.md
 ADMIN_EMAIL = "admin@veteranpassage.org"
-ADMIN_PASSWORD = "VetPass2026!"
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
 TEST_USER_EMAIL = "testvet@test.com"
 TEST_USER_PASSWORD = "TestPass123"
 

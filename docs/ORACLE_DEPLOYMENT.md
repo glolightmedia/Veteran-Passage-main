@@ -23,7 +23,7 @@ chmod 600 .env.production
 Required values:
 
 ```bash
-JWT_SECRET=replace-with-a-long-random-secret
+JWT_SECRET=replace-with-a-strong-random-32-plus-character-secret
 FRONTEND_URL=https://your-domain.example
 CORS_ORIGINS=https://your-domain.example,https://www.your-domain.example
 PUBLIC_API_URL=https://api.your-domain.example
@@ -33,8 +33,43 @@ SUPERADMIN_EMAIL=glolightmedia@gmail.com
 SUPERADMIN_PASSWORD=replace-with-a-strong-temporary-superadmin-password
 ```
 
+Generate `JWT_SECRET` on your workstation or server:
+
+```bash
+openssl rand -base64 48
+```
+
+If OpenSSL is not available:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
 Use `ENVIRONMENT=production`, `COOKIE_SECURE=true`, and `COOKIE_SAMESITE=none` when frontend and backend are on HTTPS origins.
 `SUPERADMIN_PASSWORD` is only needed for first bootstrap or approved recovery. Remove it from the runtime env after confirming the SuperAdmin account works.
+
+Domain examples:
+
+```bash
+# Current hosted domain during transition
+FRONTEND_URL=https://veteranpassage.org
+CORS_ORIGINS=https://veteranpassage.org,https://www.veteranpassage.org,https://veteran-pathways.emergent.host,https://www.veteran-pathways.emergent.host
+PUBLIC_API_URL=https://api.your-domain.example
+
+# Future Oracle/Cloudflare deployment
+FRONTEND_URL=https://veteranpassage.org
+CORS_ORIGINS=https://veteranpassage.org,https://www.veteranpassage.org
+PUBLIC_API_URL=https://api.veteranpassage.org
+```
+
+SuperAdmin bootstrap:
+
+1. Set `SUPERADMIN_EMAIL=glolightmedia@gmail.com`.
+2. Set a strong temporary `SUPERADMIN_PASSWORD`.
+3. Start the backend.
+4. Log in as `glolightmedia@gmail.com` and verify the SuperAdmin dashboard loads.
+5. Remove `SUPERADMIN_PASSWORD` from the server env.
+6. Recreate the backend container so the password is no longer present in runtime environment variables.
 
 ## Docker Compose Commands
 
@@ -85,6 +120,27 @@ docker compose -f docker-compose.prod.yml exec mongodb mongorestore --archive=/t
 ```
 
 Keep offsite encrypted backups before every deployment.
+
+## Dependency Audits
+
+The frontend deployment path is npm-based because the production Dockerfile uses npm and this repo now includes `frontend/package-lock.json`.
+Use the legacy peer resolver until the existing React/CRA/date-fns peer conflicts are cleaned up:
+
+```bash
+cd frontend
+npm ci --legacy-peer-deps
+npm audit --omit=dev
+```
+
+For Python dependency scanning, install the scanner locally or in CI, not as a runtime backend dependency:
+
+```bash
+python -m pip install pip-audit
+cd backend
+python -m pip_audit -r requirements.txt
+```
+
+Treat high/critical findings as release blockers unless they are proven unreachable in production.
 
 ## Production Notes
 

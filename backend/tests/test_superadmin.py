@@ -10,10 +10,10 @@ import time
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 
 # Test credentials
-SUPERADMIN_EMAIL = "glolightmedia@gmail.com"
-SUPERADMIN_PASSWORD = "M@rinecorp1"
+SUPERADMIN_EMAIL = os.environ.get("SUPERADMIN_EMAIL", "glolightmedia@gmail.com")
+SUPERADMIN_PASSWORD = os.environ.get("SUPERADMIN_PASSWORD", "")
 ADMIN_EMAIL = "admin@veteranpassage.org"
-ADMIN_PASSWORD = "VetPass2026!"
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
 CUSTOMER_EMAIL = "testvet@test.com"
 CUSTOMER_PASSWORD = "TestPass123"
 

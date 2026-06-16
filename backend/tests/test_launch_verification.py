@@ -14,10 +14,10 @@ from datetime import datetime
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 
 # Test credentials from test_credentials.md
-SUPERADMIN_EMAIL = "glolightmedia@gmail.com"
-SUPERADMIN_PASSWORD = "M@rinecorp1"
+SUPERADMIN_EMAIL = os.environ.get("SUPERADMIN_EMAIL", "glolightmedia@gmail.com")
+SUPERADMIN_PASSWORD = os.environ.get("SUPERADMIN_PASSWORD", "")
 SYSTEM_ADMIN_EMAIL = "admin@veteranpassage.org"
-SYSTEM_ADMIN_PASSWORD = "VetPass2026!"
+SYSTEM_ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
 EMPLOYER_EMAIL = "launch_employer@test.com"
 EMPLOYER_PASSWORD = "EmployerTest1!"
 VETERAN_EMAIL = "testvet@test.com"

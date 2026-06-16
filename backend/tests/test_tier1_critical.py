@@ -169,8 +169,8 @@ class TestSuperadminLeads:
         """Login as admin"""
         self.session = requests.Session()
         login_resp = self.session.post(f"{BASE_URL}/api/auth/login", json={
-            "email": "glolightmedia@gmail.com",
-            "password": "M@rinecorp1"
+            "email": os.environ.get("SUPERADMIN_EMAIL", "glolightmedia@gmail.com"),
+            "password": os.environ.get("SUPERADMIN_PASSWORD", "")
         })
         assert login_resp.status_code == 200, f"Admin login failed: {login_resp.text}"
     

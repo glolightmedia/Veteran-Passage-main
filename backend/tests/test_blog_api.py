@@ -11,8 +11,8 @@ import os
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 
 # Test credentials from test_credentials.md
-SUPERADMIN_EMAIL = "glolightmedia@gmail.com"
-SUPERADMIN_PASSWORD = "M@rinecorp1"
+SUPERADMIN_EMAIL = os.environ.get("SUPERADMIN_EMAIL", "glolightmedia@gmail.com")
+SUPERADMIN_PASSWORD = os.environ.get("SUPERADMIN_PASSWORD", "")
 
 # Article slugs from seed data
 ARTICLE_SLUGS = [
