@@ -24,10 +24,10 @@ Required values:
 
 ```bash
 JWT_SECRET=replace-with-a-strong-random-32-plus-character-secret
-FRONTEND_URL=https://your-domain.example
-CORS_ORIGINS=https://your-domain.example,https://www.your-domain.example
-PUBLIC_API_URL=https://api.your-domain.example
-ADMIN_EMAIL=admin@your-domain.example
+FRONTEND_URL=https://veteranpassage.com
+CORS_ORIGINS=https://veteranpassage.com,https://www.veteranpassage.com
+PUBLIC_API_URL=https://api.veteranpassage.com
+ADMIN_EMAIL=admin@veteranpassage.com
 ADMIN_PASSWORD=replace-with-a-strong-temporary-password
 SUPERADMIN_EMAIL=glolightmedia@gmail.com
 SUPERADMIN_PASSWORD=replace-with-a-strong-temporary-superadmin-password
@@ -51,15 +51,10 @@ Use `ENVIRONMENT=production`, `COOKIE_SECURE=true`, and `COOKIE_SAMESITE=none` w
 Domain examples:
 
 ```bash
-# Current hosted domain during transition
-FRONTEND_URL=https://veteranpassage.org
-CORS_ORIGINS=https://veteranpassage.org,https://www.veteranpassage.org,https://veteran-pathways.emergent.host,https://www.veteran-pathways.emergent.host
-PUBLIC_API_URL=https://api.your-domain.example
-
-# Future Oracle/Cloudflare deployment
-FRONTEND_URL=https://veteranpassage.org
-CORS_ORIGINS=https://veteranpassage.org,https://www.veteranpassage.org
-PUBLIC_API_URL=https://api.veteranpassage.org
+# Oracle/Cloudflare production deployment
+FRONTEND_URL=https://veteranpassage.com
+CORS_ORIGINS=https://veteranpassage.com,https://www.veteranpassage.com
+PUBLIC_API_URL=https://api.veteranpassage.com
 ```
 
 SuperAdmin bootstrap:
