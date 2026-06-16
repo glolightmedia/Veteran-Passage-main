@@ -38,6 +38,14 @@ from routes.roadmap import router as roadmap_router, set_db as set_roadmap_db
 from routes.opportunities import router as opportunities_router, set_db as set_opportunities_db, seed_starter_opportunities
 from utils.auth import hash_password, verify_password
 from utils.audit import log_audit_event
+from utils.security import (
+    get_environment,
+    get_superadmin_email,
+    is_production,
+    is_strong_password,
+    rate_limit,
+    validate_security_environment,
+)
 
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
@@ -51,25 +59,26 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+validate_security_environment(logger)
 
 # CORS — explicit origins for credential support (browsers reject * with credentials)
-frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
-allowed_origins = [
-    frontend_url,
-    "http://localhost:3000",
-    "https://veteran-pathways.emergent.host",
-    "https://www.veteran-pathways.emergent.host",
-    "https://veteranpassage.org",
-    "https://www.veteranpassage.org",
-]
+def parse_origins(value: str) -> list:
+    return [origin.strip().rstrip("/") for origin in (value or "").split(",") if origin.strip()]
+
+
+frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000").rstrip("/")
+allowed_origin_set = {frontend_url, *parse_origins(os.environ.get("CORS_ORIGINS", ""))}
+if not is_production():
+    allowed_origin_set.add("http://localhost:3000")
+allowed_origins = sorted(origin for origin in allowed_origin_set if origin)
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response as StarletteResponse
 
 class CustomCORSMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
-        origin = request.headers.get("origin", "")
-        is_allowed = any(origin == o for o in allowed_origins) or origin.endswith(".emergent.host") or origin.endswith(".emergentagent.com")
+        origin = request.headers.get("origin", "").rstrip("/")
+        is_allowed = origin in allowed_origins
 
         if request.method == "OPTIONS":
             response = StarletteResponse(status_code=200)
@@ -86,6 +95,32 @@ class CustomCORSMiddleware(BaseHTTPMiddleware):
         return response
 
 app.add_middleware(CustomCORSMiddleware)
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        if request.url.path.startswith("/api/"):
+            response.headers.setdefault("Cache-Control", "no-store")
+        if is_production():
+            response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+        return response
+
+
+class AdminRateLimitMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        sensitive_prefixes = ("/api/admin", "/api/superadmin", "/api/dev/create-admin")
+        if any(request.url.path.startswith(prefix) for prefix in sensitive_prefixes):
+            await rate_limit(request, "admin_sensitive", limit=120, window_seconds=60)
+        return await call_next(request)
+
+
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(AdminRateLimitMiddleware)
 
 # Set DB on all route modules
 for setter in [set_auth_db, set_admin_db, set_provider_db, set_customer_db, set_interactions_db, set_developer_db, set_triage_db, set_mentorship_db, set_jobs_db, set_chatbot_db, set_forum_db, set_superadmin_db, set_donate_db, set_intake_db, set_intelligence_db, set_progress_db, set_dd214_db, set_barter_db, set_partners_db, set_events_db, set_link_health_db, set_blog_db, set_roadmap_db, set_opportunities_db]:
@@ -125,6 +160,8 @@ async def health_check():
 
 @app.post("/api/dev/create-admin")
 async def dev_create_admin(request: Request):
+    await rate_limit(request, "dev_admin_bootstrap", limit=5, window_seconds=900)
+
     async def audit(success: bool, reason: str, email: str = None):
         await log_audit_event(
             db,
@@ -160,9 +197,14 @@ async def dev_create_admin(request: Request):
 
     email = body.get("email", "").lower().strip()
     password = body.get("password", "")
-    if not email or not password or len(password) < 6:
+    if not email or not password or not is_strong_password(password):
         await audit(False, "invalid_email_or_password", email)
-        raise HTTPException(status_code=400, detail="Email and password (min 6) required")
+        raise HTTPException(status_code=400, detail="Strong email and password required")
+
+    allowed_superadmin_email = get_superadmin_email()
+    if allowed_superadmin_email and email != allowed_superadmin_email:
+        await audit(False, "superadmin_email_not_allowed", email)
+        raise HTTPException(status_code=403, detail="Bootstrap disabled")
 
     allow_recovery = os.environ.get("ALLOW_SUPERADMIN_RECOVERY", "").strip().lower() == "true"
     superadmin_exists = await db.users.find_one({"role": "superadmin"}, {"_id": 1})
@@ -188,10 +230,16 @@ async def dev_create_admin(request: Request):
 
 @app.post("/api/webhook/stripe")
 async def stripe_webhook(request: Request):
-    from emergentintegrations.payments.stripe.checkout import StripeCheckout
     body = await request.body()
     sig = request.headers.get("Stripe-Signature")
     api_key = os.environ.get("STRIPE_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=503, detail="Stripe webhook is not configured")
+    try:
+        from emergentintegrations.payments.stripe.checkout import StripeCheckout
+    except ImportError:
+        raise HTTPException(status_code=503, detail="Stripe webhook integration is not installed")
+
     host_url = str(request.base_url).rstrip("/")
     webhook_url = f"{host_url}/api/webhook/stripe"
 
@@ -275,30 +323,79 @@ async def startup():
     await seed_starter_opportunities(db)
     logger.info("MongoDB indexes created")
 
-    # Seed admin
-    admin_email = os.environ.get("ADMIN_EMAIL", "admin@veteranpassage.org")
-    admin_password = os.environ.get("ADMIN_PASSWORD", "VetPass2026!")
+    admin_email = os.environ.get("ADMIN_EMAIL", "").lower().strip()
+    admin_password = os.environ.get("ADMIN_PASSWORD", "")
+    if not is_production():
+        admin_email = admin_email or "admin@veteranpassage.org"
 
-    existing = await db.users.find_one({"email": admin_email})
-    if existing is None:
-        await db.users.insert_one({
-            "email": admin_email,
-            "password_hash": hash_password(admin_password),
-            "full_name": "Admin",
-            "role": "admin",
-            "branch": None,
-            "discharge": None,
-            "location": None,
-            "saved_resources": [],
-            "created_at": datetime.now(timezone.utc).isoformat()
-        })
-        logger.info(f"Admin user seeded: {admin_email}")
-    elif not verify_password(admin_password, existing["password_hash"]):
-        await db.users.update_one(
-            {"email": admin_email},
-            {"$set": {"password_hash": hash_password(admin_password)}}
-        )
-        logger.info("Admin password updated")
+    if admin_email and admin_password:
+        if is_production() and not is_strong_password(admin_password):
+            raise RuntimeError("ADMIN_PASSWORD must be strong in production")
+
+        existing = await db.users.find_one({"email": admin_email})
+        if existing is None:
+            await db.users.insert_one({
+                "email": admin_email,
+                "password_hash": hash_password(admin_password),
+                "full_name": "Admin",
+                "role": "admin",
+                "branch": None,
+                "discharge": None,
+                "location": None,
+                "saved_resources": [],
+                "created_at": datetime.now(timezone.utc).isoformat()
+            })
+            logger.info(f"Admin user seeded: {admin_email}")
+        elif os.environ.get("ALLOW_ADMIN_PASSWORD_SYNC", "").strip().lower() == "true" and not verify_password(admin_password, existing["password_hash"]):
+            await db.users.update_one(
+                {"email": admin_email},
+                {"$set": {"password_hash": hash_password(admin_password)}}
+            )
+            logger.info("Admin password updated")
+        else:
+            logger.info("Admin user already exists; password unchanged")
+    else:
+        logger.info("Admin bootstrap skipped; ADMIN_EMAIL and ADMIN_PASSWORD not both set")
+
+    superadmin_email = get_superadmin_email()
+    superadmin_password = os.environ.get("SUPERADMIN_PASSWORD", "")
+    if superadmin_email and superadmin_password:
+        if not is_strong_password(superadmin_password):
+            raise RuntimeError("SUPERADMIN_PASSWORD must be strong")
+
+        allow_recovery = os.environ.get("ALLOW_SUPERADMIN_RECOVERY", "").strip().lower() == "true"
+        existing_superadmin = await db.users.find_one({"role": "superadmin"})
+        existing_email_user = await db.users.find_one({"email": superadmin_email})
+
+        if existing_superadmin and existing_superadmin.get("email") != superadmin_email and not allow_recovery:
+            logger.warning("SuperAdmin bootstrap skipped; a different SuperAdmin already exists")
+        elif existing_email_user:
+            if existing_email_user.get("role") != "superadmin" or allow_recovery:
+                await db.users.update_one(
+                    {"email": superadmin_email},
+                    {"$set": {
+                        "role": "superadmin",
+                        "password_hash": hash_password(superadmin_password),
+                        "intake_completed": True,
+                    }}
+                )
+                logger.info(f"SuperAdmin user bootstrapped: {superadmin_email}")
+            else:
+                logger.info("SuperAdmin user already exists; password unchanged")
+        elif not existing_superadmin or allow_recovery:
+            await db.users.insert_one({
+                "email": superadmin_email,
+                "password_hash": hash_password(superadmin_password),
+                "full_name": "SuperAdmin",
+                "role": "superadmin",
+                "branch": None,
+                "discharge": None,
+                "location": None,
+                "saved_resources": [],
+                "intake_completed": True,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            })
+            logger.info(f"SuperAdmin user bootstrapped: {superadmin_email}")
 
     logger.info("Veteran Passage API v2.0 started — RBAC enabled")
 

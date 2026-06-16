@@ -96,7 +96,6 @@ async def get_session(request: Request, session_id: str):
 
 @router.post("/sessions/{session_id}/message")
 async def send_message(request: Request, session_id: str):
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
     user = await get_current_user(request, db)
     body = await request.json()
     user_text = body.get("message", "").strip()
@@ -117,6 +116,13 @@ async def send_message(request: Request, session_id: str):
     context_system = f"{SYSTEM_PROMPT}\n\nUser context: Name={user.get('full_name','Veteran')}, Branch={branch}, Discharge={discharge}, Tier={tier}, Location={user.get('location','not specified')}"
 
     api_key = os.environ.get("EMERGENT_LLM_KEY")
+    if not api_key:
+        raise HTTPException(status_code=503, detail="AI chat is not configured")
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+    except ImportError:
+        raise HTTPException(status_code=503, detail="AI chat integration is not installed")
+
     chat = LlmChat(
         api_key=api_key,
         session_id=session_id,

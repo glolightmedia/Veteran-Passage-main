@@ -11,6 +11,7 @@ from utils.auth import (
     get_current_user, get_jwt_secret, generate_reset_token,
     JWT_ALGORITHM, normalize_role
 )
+from utils.security import get_client_ip, rate_limit
 import jwt
 
 logger = logging.getLogger(__name__)
@@ -98,7 +99,8 @@ async def record_failed_attempt(identifier: str):
 
 
 @router.post("/register")
-async def register(data: UserRegister, response: Response):
+async def register(data: UserRegister, request: Request, response: Response):
+    await rate_limit(request, "auth_register", limit=10, window_seconds=300)
     email = data.email.lower().strip()
     existing = await db.users.find_one({"email": email})
     if existing:
@@ -133,7 +135,8 @@ async def register(data: UserRegister, response: Response):
 @router.post("/login")
 async def login(data: UserLogin, request: Request, response: Response):
     email = data.email.lower().strip()
-    client_ip = request.client.host if request.client else "unknown"
+    await rate_limit(request, "auth_login", limit=30, window_seconds=300)
+    client_ip = get_client_ip(request)
     identifier = f"{client_ip}:{email}"
 
     await check_brute_force(identifier)

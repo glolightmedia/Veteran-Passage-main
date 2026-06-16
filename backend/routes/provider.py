@@ -23,6 +23,17 @@ def set_db(database):
     db = database
 
 
+def get_emergent_checkout():
+    api_key = os.environ.get("STRIPE_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=503, detail="Promotion checkout is not configured")
+    try:
+        from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionRequest
+    except ImportError:
+        raise HTTPException(status_code=503, detail="Promotion checkout integration is not installed")
+    return StripeCheckout, CheckoutSessionRequest, api_key
+
+
 @router.get("/resources")
 async def list_own_resources(request: Request):
     user = await require_role(request, db, ["partner", "admin"])
@@ -101,7 +112,7 @@ async def get_promotion_plans(request: Request):
 
 @router.post("/promotions/checkout")
 async def create_promotion_checkout(request: Request, data: PromotionCreate):
-    from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionRequest
+    StripeCheckout, CheckoutSessionRequest, api_key = get_emergent_checkout()
     user = await require_role(request, db, ["partner", "admin"])
 
     resource = await db.resources.find_one({"_id": ObjectId(data.resource_id)})
@@ -116,7 +127,6 @@ async def create_promotion_checkout(request: Request, data: PromotionCreate):
     if not plan:
         raise HTTPException(status_code=400, detail="Invalid plan")
 
-    api_key = os.environ.get("STRIPE_API_KEY")
     host_url = str(request.base_url).rstrip("/")
     origin_url = request.headers.get("X-Origin-URL", os.environ.get("FRONTEND_URL", host_url))
 
@@ -160,7 +170,7 @@ async def create_promotion_checkout(request: Request, data: PromotionCreate):
 
 @router.get("/promotions/status/{session_id}")
 async def check_promotion_status(request: Request, session_id: str):
-    from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionRequest
+    StripeCheckout, _, api_key = get_emergent_checkout()
     user = await require_role(request, db, ["partner", "admin"])
 
     tx = await db.payment_transactions.find_one({"session_id": session_id})
@@ -172,7 +182,6 @@ async def check_promotion_status(request: Request, session_id: str):
     if tx.get("payment_status") == "paid":
         return {"status": "paid", "payment_status": "paid"}
 
-    api_key = os.environ.get("STRIPE_API_KEY")
     host_url = str(request.base_url).rstrip("/")
     webhook_url = f"{host_url}api/webhook/stripe"
     stripe_checkout = StripeCheckout(api_key=api_key, webhook_url=webhook_url)

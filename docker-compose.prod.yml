@@ -1,0 +1,56 @@
+services:
+  mongodb:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - veterans_passage
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      - mongodb
+    environment:
+      MONGO_URL: mongodb://mongodb:27017
+      DB_NAME: ${DB_NAME:-veteran_passage}
+      JWT_SECRET: ${JWT_SECRET}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      FRONTEND_URL: ${FRONTEND_URL}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      COOKIE_SAMESITE: ${COOKIE_SAMESITE:-none}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ALLOW_ADMIN_PASSWORD_SYNC: ${ALLOW_ADMIN_PASSWORD_SYNC:-false}
+      SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-glolightmedia@gmail.com}
+      SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-}
+      ENABLE_DEV_ADMIN_BOOTSTRAP: ${ENABLE_DEV_ADMIN_BOOTSTRAP:-false}
+      BOOTSTRAP_ADMIN_TOKEN: ${BOOTSTRAP_ADMIN_TOKEN:-}
+      ALLOW_SUPERADMIN_RECOVERY: ${ALLOW_SUPERADMIN_RECOVERY:-false}
+      STRIPE_API_KEY: ${STRIPE_API_KEY:-}
+    ports:
+      - "${BACKEND_PORT:-8011}:8011"
+    networks:
+      - veterans_passage
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        REACT_APP_BACKEND_URL: ${PUBLIC_API_URL}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    networks:
+      - veterans_passage
+
+volumes:
+  mongodb_data:
+
+networks:
+  veterans_passage:

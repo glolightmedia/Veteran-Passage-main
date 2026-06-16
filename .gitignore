@@ -6,6 +6,8 @@ frontend/node_modules/
 .env
 .env.*
 *.env
+!.env.example
+!*.env.example
 credentials.json
 *credentials.json*
 *token.json*
