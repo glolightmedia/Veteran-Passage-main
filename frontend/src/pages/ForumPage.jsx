@@ -309,7 +309,7 @@ export default function ForumPage() {
                         <span className="font-medium text-foreground">{activePost.author_name}</span> &middot; {new Date(activePost.created_at).toLocaleDateString()}
                       </div>
                       <div className="flex gap-1.5">
-                        {(user?.role === 'admin' || user?.role === 'moderator') && (
+                        {(user?.role === 'admin' || user?.role === 'content_manager') && (
                           <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={async () => {
                             try {
                               const { data } = await axios.post(`${API}/api/forum/posts/${activePost.id}/pin`, {}, { withCredentials: true });

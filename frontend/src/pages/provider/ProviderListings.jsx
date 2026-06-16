@@ -81,7 +81,7 @@ export default function ProviderListings() {
   };
 
   return (
-    <RoleLayout navItems={providerNav} roleLabel="Provider" roleColor="bg-blue-100 text-blue-700">
+    <RoleLayout navItems={providerNav} roleLabel="Partner" roleColor="bg-blue-100 text-blue-700">
       <div className="space-y-5" data-testid="provider-listings-page">
         <div className="flex items-center justify-between">
           <div>

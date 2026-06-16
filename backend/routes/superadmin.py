@@ -5,7 +5,7 @@ from typing import Optional
 import logging
 
 from utils.auth import hash_password
-from utils.rbac import require_superadmin, ROLES, PARTNER_SUBTYPES, BILLING_PLANS
+from utils.rbac import require_superadmin, ROLES, ROLE_ALIASES, normalize_role, PARTNER_SUBTYPES, BILLING_PLANS
 from utils.audit import log_audit_event
 
 logger = logging.getLogger(__name__)
@@ -16,6 +16,12 @@ db = None
 def set_db(database):
     global db
     db = database
+
+
+def role_query(role: str) -> dict:
+    canonical = normalize_role(role)
+    aliases = [alias for alias, target in ROLE_ALIASES.items() if target == canonical]
+    return {"$in": [canonical, *aliases]} if aliases else canonical
 
 
 
@@ -126,8 +132,10 @@ async def edit_user(request: Request, user_id: str):
     update = {k: v for k, v in body.items() if k in allowed and v is not None}
     if not update:
         raise HTTPException(status_code=400, detail="No valid fields to update")
-    if "role" in update and update["role"] not in ROLES:
-        raise HTTPException(status_code=400, detail=f"Invalid role. Must be: {', '.join(ROLES)}")
+    if "role" in update:
+        update["role"] = normalize_role(update["role"])
+        if update["role"] not in ROLES:
+            raise HTTPException(status_code=400, detail=f"Invalid role. Must be: {', '.join(ROLES)}")
     existing = await db.users.find_one({"_id": ObjectId(user_id)})
     if not existing:
         raise HTTPException(status_code=404, detail="User not found")
@@ -182,7 +190,7 @@ async def deep_analytics(request: Request):
     total_users = await db.users.count_documents({})
     role_counts = {}
     for role in ROLES:
-        role_counts[role] = await db.users.count_documents({"role": role})
+        role_counts[role] = await db.users.count_documents({"role": role_query(role)})
 
     # Signups over last 30 days
     thirty_days_ago = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
@@ -482,7 +490,7 @@ async def create_user(request: Request):
     if existing:
         raise HTTPException(status_code=400, detail="User with this email already exists")
 
-    role = body.get("role", "customer")
+    role = normalize_role(body.get("role", "veteran"))
     if role not in ROLES:
         raise HTTPException(status_code=400, detail=f"Invalid role. Must be: {', '.join(ROLES)}")
 
@@ -510,7 +518,7 @@ async def create_user(request: Request):
         "billing_plan": body.get("billing_plan"),
         "suspended": False,
         "saved_resources": [],
-        "intake_completed": role != "customer",
+        "intake_completed": role != "veteran",
         "created_by": admin["id"],
         "created_at": datetime.now(timezone.utc).isoformat()
     }

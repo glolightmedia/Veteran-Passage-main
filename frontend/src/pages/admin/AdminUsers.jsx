@@ -19,12 +19,24 @@ const adminNav = [
 ];
 
 const ROLE_COLORS = {
+  superadmin: 'bg-amber-100 text-amber-800',
   admin: 'bg-red-100 text-red-700',
-  moderator: 'bg-orange-100 text-orange-700',
-  provider: 'bg-blue-100 text-blue-700',
-  developer: 'bg-purple-100 text-purple-700',
-  customer: 'bg-green-100 text-green-700',
+  content_manager: 'bg-orange-100 text-orange-700',
+  partner: 'bg-blue-100 text-blue-700',
+  veteran: 'bg-green-100 text-green-700',
 };
+
+const ROLE_OPTIONS = [
+  { value: 'veteran', label: 'Veteran' },
+  { value: 'partner', label: 'Partner' },
+  { value: 'content_manager', label: 'Content Manager' },
+  { value: 'admin', label: 'Admin' },
+  { value: 'superadmin', label: 'SuperAdmin' },
+];
+
+function formatRole(role) {
+  return ROLE_OPTIONS.find(option => option.value === role)?.label || role?.replace('_', ' ') || 'Veteran';
+}
 
 export default function AdminUsers() {
   const [users, setUsers] = useState([]);
@@ -118,11 +130,9 @@ export default function AdminUsers() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Roles</SelectItem>
-              <SelectItem value="admin">Admin</SelectItem>
-              <SelectItem value="moderator">Moderator</SelectItem>
-              <SelectItem value="provider">Provider</SelectItem>
-              <SelectItem value="developer">Developer</SelectItem>
-              <SelectItem value="customer">Customer</SelectItem>
+              {ROLE_OPTIONS.map(role => (
+                <SelectItem key={role.value} value={role.value}>{role.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -155,7 +165,7 @@ export default function AdminUsers() {
                     </td>
                     <td className="p-3">
                       <div className="flex items-center gap-2">
-                        <Badge className={`text-xs rounded-full border-0 ${ROLE_COLORS[u.role] || ROLE_COLORS.customer}`}>{u.role || 'customer'}</Badge>
+                        <Badge className={`text-xs rounded-full border-0 ${ROLE_COLORS[u.role] || ROLE_COLORS.veteran}`}>{formatRole(u.role)}</Badge>
                         {u.suspended && <Badge variant="destructive" className="text-xs rounded-full">Suspended</Badge>}
                       </div>
                     </td>
@@ -170,8 +180,8 @@ export default function AdminUsers() {
                             <span>Role</span>
                           </SelectTrigger>
                           <SelectContent>
-                            {['admin', 'moderator', 'provider', 'developer', 'customer'].map(r => (
-                              <SelectItem key={r} value={r} className="text-xs capitalize">{r}</SelectItem>
+                            {ROLE_OPTIONS.map(r => (
+                              <SelectItem key={r.value} value={r.value} className="text-xs">{r.label}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>

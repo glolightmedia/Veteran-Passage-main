@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from bson import ObjectId
 import logging
 
-from utils.rbac import ROLES, require_role
+from utils.rbac import ROLES, ROLE_ALIASES, normalize_role, require_role
 from utils.audit import log_audit_event
 from models.roles import UpdateUserRole, SuspendUser
 
@@ -19,8 +19,15 @@ def set_db(database):
 
 def sanitize_user(user: dict) -> dict:
     user["id"] = str(user.pop("_id"))
+    user["role"] = normalize_role(user.get("role"))
     user.pop("password_hash", None)
     return user
+
+
+def role_query(role: str) -> dict:
+    canonical = normalize_role(role)
+    aliases = [alias for alias, target in ROLE_ALIASES.items() if target == canonical]
+    return {"$in": [canonical, *aliases]} if aliases else canonical
 
 
 @router.get("/users")
@@ -33,7 +40,7 @@ async def list_users(
     admin = await require_role(request, db, ["admin"])
     query = {}
     if role:
-        query["role"] = role
+        query["role"] = role_query(role)
 
     skip = (page - 1) * limit
     total = await db.users.count_documents(query)
@@ -41,6 +48,7 @@ async def list_users(
     users = []
     async for user in cursor:
         user["id"] = str(user.pop("_id"))
+        user["role"] = normalize_role(user.get("role"))
         users.append(user)
 
     return {"users": users, "total": total, "page": page, "pages": (total + limit - 1) // limit}
@@ -66,15 +74,21 @@ async def update_user_role(request: Request, user_id: str, data: UpdateUserRole)
     if str(user["_id"]) == admin["id"]:
         raise HTTPException(status_code=400, detail="Cannot change your own role")
 
-    if data.role == "superadmin" and admin.get("role") != "superadmin":
+    new_role = normalize_role(data.role)
+    existing_role = normalize_role(user.get("role"))
+
+    if new_role not in ROLES:
+        raise HTTPException(status_code=400, detail=f"Invalid role. Must be: {', '.join(ROLES)}")
+
+    if new_role == "superadmin" and admin.get("role") != "superadmin":
         raise HTTPException(status_code=403, detail="Only SuperAdmin can assign SuperAdmin")
 
-    if user.get("role") == "superadmin" and admin.get("role") != "superadmin":
+    if existing_role == "superadmin" and admin.get("role") != "superadmin":
         raise HTTPException(status_code=403, detail="Only SuperAdmin can modify SuperAdmin users")
 
     await db.users.update_one(
         {"_id": ObjectId(user_id)},
-        {"$set": {"role": data.role, "role_updated_at": datetime.now(timezone.utc).isoformat()}}
+        {"$set": {"role": new_role, "role_updated_at": datetime.now(timezone.utc).isoformat()}}
     )
 
     await log_audit_event(
@@ -83,10 +97,10 @@ async def update_user_role(request: Request, user_id: str, data: UpdateUserRole)
         action="role_change",
         actor_id=admin["id"],
         target_id=user_id,
-        metadata={"old_role": user.get("role", "customer"), "new_role": data.role},
+        metadata={"old_role": existing_role, "new_role": new_role},
     )
 
-    return {"message": f"User role updated to {data.role}"}
+    return {"message": f"User role updated to {new_role}"}
 
 
 @router.put("/users/{user_id}/suspend")
@@ -119,7 +133,7 @@ async def get_analytics(request: Request):
     total_users = await db.users.count_documents({})
     role_counts = {}
     for role in ROLES:
-        role_counts[role] = await db.users.count_documents({"role": role})
+        role_counts[role] = await db.users.count_documents({"role": role_query(role)})
 
     total_resources = await db.resources.count_documents({})
     pending_resources = await db.resources.count_documents({"status": "pending"})
@@ -145,7 +159,7 @@ async def get_analytics(request: Request):
 
 @router.get("/resources/pending")
 async def get_pending_resources(request: Request):
-    admin = await require_role(request, db, ["admin"])
+    admin = await require_role(request, db, ["admin", "content_manager"])
     cursor = db.resources.find({"status": "pending"}).sort("created_at", -1)
     resources = []
     async for r in cursor:
@@ -156,7 +170,7 @@ async def get_pending_resources(request: Request):
 
 @router.put("/resources/{resource_id}/approve")
 async def approve_resource(request: Request, resource_id: str):
-    admin = await require_role(request, db, ["admin"])
+    admin = await require_role(request, db, ["admin", "content_manager"])
     result = await db.resources.update_one(
         {"_id": ObjectId(resource_id)},
         {"$set": {"status": "approved", "approved_by": admin["id"], "approved_at": datetime.now(timezone.utc).isoformat()}}
@@ -168,7 +182,7 @@ async def approve_resource(request: Request, resource_id: str):
 
 @router.put("/resources/{resource_id}/reject")
 async def reject_resource(request: Request, resource_id: str):
-    admin = await require_role(request, db, ["admin"])
+    admin = await require_role(request, db, ["admin", "content_manager"])
     result = await db.resources.update_one(
         {"_id": ObjectId(resource_id)},
         {"$set": {"status": "rejected", "rejected_by": admin["id"], "rejected_at": datetime.now(timezone.utc).isoformat()}}

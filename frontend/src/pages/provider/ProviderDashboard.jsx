@@ -9,9 +9,9 @@ import axios from 'axios';
 const API = process.env.REACT_APP_BACKEND_URL;
 
 const providerNav = [
-  { name: 'Overview', href: '/provider', icon: LayoutDashboard },
-  { name: 'My Listings', href: '/provider/listings', icon: ListPlus },
-  { name: 'Promotions', href: '/provider/promotions', icon: Megaphone },
+  { name: 'Overview', href: '/partner', icon: LayoutDashboard },
+  { name: 'My Listings', href: '/partner/listings', icon: ListPlus },
+  { name: 'Promotions', href: '/partner/promotions', icon: Megaphone },
 ];
 
 export default function ProviderDashboard() {
@@ -33,11 +33,11 @@ export default function ProviderDashboard() {
   ] : [];
 
   return (
-    <RoleLayout navItems={providerNav} roleLabel="Provider" roleColor="bg-blue-100 text-blue-700">
+    <RoleLayout navItems={providerNav} roleLabel="Partner" roleColor="bg-blue-100 text-blue-700">
       <PageSEO path="/provider" />
       <div className="space-y-6" data-testid="provider-dashboard">
         <div>
-          <h1 className="text-2xl font-bold text-foreground" data-testid="provider-heading">Provider Dashboard</h1>
+          <h1 className="text-2xl font-bold text-foreground" data-testid="provider-heading">Partner Dashboard</h1>
           <p className="text-sm text-muted-foreground mt-1">Manage your resource listings and promotions</p>
         </div>
 

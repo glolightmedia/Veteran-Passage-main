@@ -9,6 +9,16 @@ from bson import ObjectId
 JWT_ALGORITHM = "HS256"
 
 
+def normalize_role(role: str) -> str:
+    aliases = {
+        "customer": "veteran",
+        "provider": "partner",
+        "moderator": "content_manager",
+    }
+    normalized = (role or "veteran").strip().lower()
+    return aliases.get(normalized, normalized)
+
+
 def get_jwt_secret() -> str:
     return os.environ["JWT_SECRET"]
 
@@ -59,6 +69,7 @@ async def get_current_user(request: Request, db) -> dict:
             raise HTTPException(status_code=401, detail="User not found")
         if user.get("suspended"):
             raise HTTPException(status_code=403, detail="Account suspended. Contact support.")
+        user["role"] = normalize_role(user.get("role"))
         user["id"] = str(user.pop("_id"))
         user.pop("password_hash", None)
         return user

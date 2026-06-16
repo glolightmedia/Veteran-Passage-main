@@ -9,7 +9,7 @@ from utils.auth import (
     hash_password, verify_password,
     create_access_token, create_refresh_token,
     get_current_user, get_jwt_secret, generate_reset_token,
-    JWT_ALGORITHM
+    JWT_ALGORITHM, normalize_role
 )
 import jwt
 
@@ -63,6 +63,7 @@ def set_auth_cookies(response: Response, access_token: str, refresh_token: str):
 
 def sanitize_user(user: dict) -> dict:
     user["id"] = str(user.pop("_id"))
+    user["role"] = normalize_role(user.get("role"))
     user.pop("password_hash", None)
     return user
 
@@ -110,7 +111,7 @@ async def register(data: UserRegister, response: Response):
         "branch": data.branch,
         "discharge": data.discharge,
         "location": data.location,
-        "role": "customer",
+        "role": "veteran",
         "saved_resources": [],
         "created_at": datetime.now(timezone.utc).isoformat()
     }

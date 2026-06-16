@@ -94,7 +94,7 @@ export default function ProviderPromotions() {
   };
 
   return (
-    <RoleLayout navItems={providerNav} roleLabel="Provider" roleColor="bg-blue-100 text-blue-700">
+    <RoleLayout navItems={providerNav} roleLabel="Partner" roleColor="bg-blue-100 text-blue-700">
       <div className="space-y-6" data-testid="provider-promotions-page">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Promote Your Listings</h1>

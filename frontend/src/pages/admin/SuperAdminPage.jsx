@@ -44,6 +44,14 @@ const TABS = [
   { id: 'audit', label: 'Audit Log', icon: Activity },
 ];
 
+const ROLE_OPTIONS = [
+  { value: 'veteran', label: 'Veteran' },
+  { value: 'partner', label: 'Partner' },
+  { value: 'content_manager', label: 'Content Manager' },
+  { value: 'admin', label: 'Admin' },
+  { value: 'superadmin', label: 'SuperAdmin' },
+];
+
 export default function SuperAdminPage() {
   const [tab, setTab] = useState('overview');
   const [analytics, setAnalytics] = useState(null);
@@ -58,7 +66,7 @@ export default function SuperAdminPage() {
   const [auditTotal, setAuditTotal] = useState(0);
   const [widgets, setWidgets] = useState(null);
   const [createUserOpen, setCreateUserOpen] = useState(false);
-  const [newUser, setNewUser] = useState({ email: '', password: '', full_name: '', role: 'customer', partner_subtype: '', organization: '', state: '', billing_plan: '' });
+  const [newUser, setNewUser] = useState({ email: '', password: '', full_name: '', role: 'veteran', partner_subtype: '', organization: '', state: '', billing_plan: '' });
   const [authEvents, setAuthEvents] = useState(null);
   const [subscriptions, setSubscriptions] = useState([]);
   const [eventSummary, setEventSummary] = useState(null);
@@ -184,7 +192,7 @@ export default function SuperAdminPage() {
       const { data: d } = await axios.post(`${API}/api/superadmin/users/create`, newUser, { withCredentials: true });
       toast.success(d.message);
       setCreateUserOpen(false);
-      setNewUser({ email: '', password: '', full_name: '', role: 'customer', partner_subtype: '', organization: '', state: '', billing_plan: '' });
+      setNewUser({ email: '', password: '', full_name: '', role: 'veteran', partner_subtype: '', organization: '', state: '', billing_plan: '' });
     } catch (e) { toast.error(e.response?.data?.detail || 'Failed'); }
     setSaving(false);
   };
@@ -254,7 +262,7 @@ export default function SuperAdminPage() {
                     <Select value={newUser.role} onValueChange={v => setNewUser({...newUser, role: v})}>
                       <SelectTrigger className="rounded-lg h-9" data-testid="cu-role"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {['superadmin','admin','moderator','partner','support_agent','developer','customer'].map(r => <SelectItem key={r} value={r} className="capitalize">{r.replace('_',' ')}</SelectItem>)}
+                        {ROLE_OPTIONS.map(r => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>

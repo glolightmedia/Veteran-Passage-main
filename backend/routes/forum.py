@@ -192,7 +192,7 @@ async def delete_post(request: Request, post_id: str):
     post = await db.forum_posts.find_one({"_id": ObjectId(post_id)})
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
-    if post["author_id"] != user["id"] and user.get("role") not in ["admin", "moderator"]:
+    if post["author_id"] != user["id"] and user.get("role") not in ["admin", "content_manager"]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
     await db.forum_posts.delete_one({"_id": ObjectId(post_id)})
