@@ -18,6 +18,8 @@ import { PageSEO } from '@/components/SEO';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { LegalFastLane } from '@/components/LegalFastLane';
+import VeteranRoadmapWidget from '@/components/VeteranRoadmapWidget';
+import VeteranOpportunityWidget from '@/components/VeteranOpportunityWidget';
 import { trackEvent } from '@/utils/analytics';
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -43,7 +45,7 @@ export default function DashboardPage() {
   const tierInfo = triageTiers[tier];
 
   useEffect(() => {
-    if (!user?.intake_completed && user?.role === 'customer') { navigate('/intake'); return; }
+    if (!user?.intake_completed && user?.role === 'veteran') { navigate('/intake'); return; }
     const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
     const load = async () => {
       try {
@@ -83,10 +85,106 @@ export default function DashboardPage() {
 
   const actionsCount = progress?.actions_taken?.length || 0;
   const milestonesCount = progress?.milestones?.length || 0;
+  const isVeteranDashboard = user?.role === 'veteran';
+  const nextAction = recs?.next_action;
+  const helpDialogElement = (
+    <Dialog open={!!helpDialog} onOpenChange={(open) => { if (!open) setHelpDialog(null); }}>
+      <DialogContent className="max-w-sm rounded-2xl">
+        <DialogHeader><DialogTitle className="flex items-center gap-2"><HandHelping className="w-5 h-5" /> Request Help</DialogTitle></DialogHeader>
+        <p className="text-sm text-muted-foreground">Tell us what you need. We will keep this simple and point you to the right resources.</p>
+        <Textarea placeholder="What do you need help with? (optional)" value={helpMsg} onChange={e => setHelpMsg(e.target.value)} rows={3} className="rounded-lg" data-testid="help-message" />
+        <Button className="w-full rounded-xl bg-secondary hover:bg-secondary/90" onClick={() => requestHelp(helpDialog, '')} disabled={sending} data-testid="submit-help-btn">
+          {sending ? 'Submitting...' : 'Request Help'}
+        </Button>
+      </DialogContent>
+    </Dialog>
+  );
 
   if (loading) return (
     <DashboardLayout><div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-4 border-secondary border-t-transparent" /></div></DashboardLayout>
   );
+
+  if (isVeteranDashboard) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-5 max-w-2xl mx-auto" data-testid="dashboard-page">
+          <PageSEO path="/dashboard" />
+
+          <div>
+            <p className="text-sm text-muted-foreground">Welcome back, {user?.full_name?.split(' ')[0] || 'Veteran'}.</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground mt-1">Your Veterans Passage Dashboard</h1>
+          </div>
+
+          <Card className="border-2 border-secondary/30 rounded-2xl bg-secondary/5" data-testid="next-best-step-card">
+            <CardContent className="p-5 space-y-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-secondary">Your Next Best Step</p>
+                <h2 className="mt-2 text-xl font-bold text-foreground">
+                  {nextAction?.name || 'Start with your free resources'}
+                </h2>
+                <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+                  {nextAction?.description || 'Review benefits, jobs, housing, business, and education resources. You do not have to figure everything out at once.'}
+                </p>
+              </div>
+              <Button asChild size="lg" className="w-full sm:w-auto rounded-xl bg-secondary hover:bg-secondary/90 font-bold">
+                {nextAction?.action_url ? (
+                  <a href={nextAction.action_url} target="_blank" rel="noopener noreferrer" onClick={() => logAction('clicked', nextAction.id, nextAction.name)}>
+                    {nextAction.action_label || 'Start here'} <ArrowRight className="w-4 h-4 ml-2" />
+                  </a>
+                ) : (
+                  <Link to="/benefits">
+                    Explore Free Resources <ArrowRight className="w-4 h-4 ml-2" />
+                  </Link>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+
+          {checkIn?.nudge && (
+            <Card className="border border-amber-200 rounded-2xl bg-amber-50/40" data-testid="nudge-card">
+              <CardContent className="p-4 flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <p className="text-sm text-amber-800 flex-1">{checkIn.nudge.message}</p>
+              </CardContent>
+            </Card>
+          )}
+
+          <LegalFastLane />
+
+          <VeteranRoadmapWidget simpleMode maxSteps={3} />
+
+          <VeteranOpportunityWidget simpleMode maxItems={3} />
+
+          <Card className="border rounded-2xl" data-testid="need-help-now-card">
+            <CardContent className="p-5 space-y-4">
+              <div>
+                <h2 className="text-lg font-bold text-foreground">Need Help Now?</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Choose one area. We will point you in the right direction.</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <Button asChild variant="outline" className="h-12 justify-start rounded-xl">
+                  <a href="https://www.veteranscrisisline.net/" target="_blank" rel="noopener noreferrer" onClick={() => trackEvent('crisis_resource_click', { source: 'dashboard_help_card' })}>
+                    Crisis support
+                  </a>
+                </Button>
+                <Button type="button" variant="outline" className="h-12 justify-start rounded-xl" onClick={() => setHelpDialog('benefits')}>
+                  Benefits help
+                </Button>
+                <Button type="button" variant="outline" className="h-12 justify-start rounded-xl" onClick={() => setHelpDialog('careers')}>
+                  Job help
+                </Button>
+                <Button type="button" variant="outline" className="h-12 justify-start rounded-xl" onClick={() => setHelpDialog('business')}>
+                  Business help
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {helpDialogElement}
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -248,17 +346,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Request Help Dialog */}
-        <Dialog open={!!helpDialog} onOpenChange={(open) => { if (!open) setHelpDialog(null); }}>
-          <DialogContent className="max-w-sm rounded-2xl">
-            <DialogHeader><DialogTitle className="flex items-center gap-2"><HandHelping className="w-5 h-5" /> Request Personal Help</DialogTitle></DialogHeader>
-            <p className="text-sm text-muted-foreground">We'll connect you with a partner who specializes in {helpDialog?.replace('-', ' ')}. They'll reach out to you directly.</p>
-            <Textarea placeholder="Tell us what you need help with (optional)..." value={helpMsg} onChange={e => setHelpMsg(e.target.value)} rows={3} className="rounded-lg" data-testid="help-message" />
-            <Button className="w-full rounded-xl bg-secondary hover:bg-secondary/90" onClick={() => requestHelp(helpDialog, '')} disabled={sending} data-testid="submit-help-btn">
-              {sending ? 'Submitting...' : 'Request Help'}
-            </Button>
-          </DialogContent>
-        </Dialog>
+        {helpDialogElement}
       </div>
     </DashboardLayout>
   );

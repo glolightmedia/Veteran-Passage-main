@@ -34,6 +34,8 @@ from routes.partners import router as partners_router, set_db as set_partners_db
 from routes.events import router as events_router, set_db as set_events_db
 from routes.link_health import router as link_health_router, set_db as set_link_health_db
 from routes.blog import router as blog_router, set_db as set_blog_db
+from routes.roadmap import router as roadmap_router, set_db as set_roadmap_db
+from routes.opportunities import router as opportunities_router, set_db as set_opportunities_db, seed_starter_opportunities
 from utils.auth import hash_password, verify_password
 from utils.audit import log_audit_event
 
@@ -86,7 +88,7 @@ class CustomCORSMiddleware(BaseHTTPMiddleware):
 app.add_middleware(CustomCORSMiddleware)
 
 # Set DB on all route modules
-for setter in [set_auth_db, set_admin_db, set_provider_db, set_customer_db, set_interactions_db, set_developer_db, set_triage_db, set_mentorship_db, set_jobs_db, set_chatbot_db, set_forum_db, set_superadmin_db, set_donate_db, set_intake_db, set_intelligence_db, set_progress_db, set_dd214_db, set_barter_db, set_partners_db, set_events_db, set_link_health_db, set_blog_db]:
+for setter in [set_auth_db, set_admin_db, set_provider_db, set_customer_db, set_interactions_db, set_developer_db, set_triage_db, set_mentorship_db, set_jobs_db, set_chatbot_db, set_forum_db, set_superadmin_db, set_donate_db, set_intake_db, set_intelligence_db, set_progress_db, set_dd214_db, set_barter_db, set_partners_db, set_events_db, set_link_health_db, set_blog_db, set_roadmap_db, set_opportunities_db]:
     setter(db)
 
 # Include all routers
@@ -112,6 +114,8 @@ app.include_router(partners_router)
 app.include_router(events_router)
 app.include_router(link_health_router)
 app.include_router(blog_router)
+app.include_router(roadmap_router)
+app.include_router(opportunities_router)
 
 
 @app.get("/api/health")
@@ -261,6 +265,14 @@ async def startup():
     await db.analytics_events.create_index("event")
     await db.analytics_events.create_index("created_at")
     await db.analytics_events.create_index("user_id")
+    await db.roadmaps.create_index("user_id", unique=True)
+    await db.opportunities.create_index("id", unique=True)
+    await db.opportunities.create_index("category")
+    await db.opportunities.create_index("state")
+    await db.opportunities.create_index("is_active")
+    await db.saved_opportunities.create_index([("user_id", 1), ("opportunity_id", 1)], unique=True)
+    await db.saved_opportunities.create_index("status")
+    await seed_starter_opportunities(db)
     logger.info("MongoDB indexes created")
 
     # Seed admin
