@@ -320,16 +320,33 @@ function ResourceLink({ item, onClick }) {
   );
 }
 
+function normalizeRoadmapSections(roadmap) {
+  const source = roadmap.sections || roadmap.roadmap_steps || [];
+  return source.map((section) => ({
+    key: section.key || section.id || section.title,
+    label: section.label || section.title,
+    href: section.href || section.action_url,
+    type: section.type || 'Roadmap step',
+    priority: section.priority || 1,
+    why: section.why || section.description,
+    nextStep: section.nextStep || section.next_step || section.description,
+  }));
+}
+
 function RoadmapCard({ roadmap, onResourceClick }) {
+  const sections = normalizeRoadmapSections(roadmap);
+  const topFocus = roadmap.topFocus || sections[0]?.label || 'Benefits resources';
+  const summary = roadmap.summary || `Saved to your account. Progress: ${roadmap.completion_percentage || 0}% complete. This is an educational roadmap, not an eligibility decision or professional advice.`;
+
   return (
     <div className="mt-3 space-y-3">
       <div className="rounded-xl border bg-background p-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-secondary">Veteran Roadmap</p>
-        <p className="mt-1 text-sm font-bold text-foreground">Start with {roadmap.topFocus}</p>
-        <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{roadmap.summary}</p>
+        <p className="mt-1 text-sm font-bold text-foreground">Start with {topFocus}</p>
+        <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{summary}</p>
       </div>
       <div className="space-y-2">
-        {roadmap.sections.map((section) => (
+        {sections.map((section) => (
           <div key={section.key} className="rounded-xl border bg-background p-3">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -375,6 +392,9 @@ export default function VeteranSuccessAssistant() {
   const [roadmapDraft, setRoadmapDraft] = useState(roadmapDraftInitial);
   const [roadmapError, setRoadmapError] = useState('');
   const [roadmapLoading, setRoadmapLoading] = useState(false);
+  const [savedRoadmap, setSavedRoadmap] = useState(null);
+  const [roadmapFetchState, setRoadmapFetchState] = useState('idle');
+  const savedRoadmapAnnouncedRef = useRef(false);
   const roadmapErrorId = 'assistant-roadmap-error';
 
   const showLeadPrompt = leadOffered && !leadSubmitted;
@@ -484,6 +504,45 @@ export default function VeteranSuccessAssistant() {
     trackEvent('assistant_opened', { source: 'floating_widget' });
   };
 
+  const loadSavedRoadmap = useCallback(async () => {
+    if (!isAuthenticated) {
+      setSavedRoadmap(null);
+      setRoadmapFetchState('ready');
+      return null;
+    }
+
+    setRoadmapFetchState('loading');
+    try {
+      const { data } = await axios.get(`${API}/api/roadmap`, { withCredentials: true });
+      const roadmap = data.roadmap || null;
+      setSavedRoadmap(roadmap);
+      setRoadmapFetchState('ready');
+      return roadmap;
+    } catch {
+      setRoadmapFetchState('error');
+      return null;
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    loadSavedRoadmap().then((roadmap) => {
+      if (!active || !roadmap || savedRoadmapAnnouncedRef.current) return;
+      savedRoadmapAnnouncedRef.current = true;
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          text: 'I found your saved Veteran Roadmap. You can continue it from here or track progress on your dashboard.',
+          roadmap,
+          category: 'roadmap',
+        },
+      ]);
+    });
+    return () => { active = false; };
+  }, [open, loadSavedRoadmap]);
+
   const submitPrompt = (text, category, promptLabel) => {
     const trimmed = text.trim();
     if (!trimmed) return;
@@ -498,7 +557,24 @@ export default function VeteranSuccessAssistant() {
     });
   };
 
-  const startRoadmapFlow = () => {
+  const startRoadmapFlow = async () => {
+    const existingRoadmap = savedRoadmap || await loadSavedRoadmap();
+    if (existingRoadmap) {
+      setRoadmapOpen(false);
+      setMessages((prev) => [
+        ...prev,
+        { role: 'user', text: 'Build My Veteran Roadmap' },
+        {
+          role: 'assistant',
+          text: 'You already have a saved Veteran Roadmap. Here it is so you can keep moving instead of starting over.',
+          roadmap: existingRoadmap,
+          category: 'roadmap',
+        },
+      ]);
+      trackEvent('assistant_saved_roadmap_viewed', { source: 'floating_widget' });
+      return;
+    }
+
     setRoadmapOpen(true);
     setRoadmapDraft(roadmapDraftInitial);
     setRoadmapError('');
@@ -507,7 +583,9 @@ export default function VeteranSuccessAssistant() {
       { role: 'user', text: 'Build My Veteran Roadmap' },
       {
         role: 'assistant',
-        text: 'I can build a free educational roadmap from five basics. I will not save it to your account yet, and I will not give legal, medical, financial, or VA claims advice.',
+        text: isAuthenticated
+          ? 'I can build and save a free educational roadmap from five basics. I will not give legal, medical, financial, or VA claims advice.'
+          : 'I can build a free educational roadmap from five basics. Sign in to save it to your account. I will not give legal, medical, financial, or VA claims advice.',
         category: 'roadmap_intro',
       },
     ]);
@@ -519,7 +597,7 @@ export default function VeteranSuccessAssistant() {
     if (roadmapError) setRoadmapError('');
   };
 
-  const submitRoadmap = (event) => {
+  const submitRoadmap = async (event) => {
     event.preventDefault();
     const missing = Object.entries(roadmapDraft).filter(([, value]) => !value.trim()).map(([key]) => key);
     if (missing.length > 0) {
@@ -529,12 +607,29 @@ export default function VeteranSuccessAssistant() {
 
     setRoadmapLoading(true);
     try {
-      const roadmap = buildVeteranRoadmap(roadmapDraft);
+      let roadmap;
+      if (isAuthenticated) {
+        const { data } = await axios.post(`${API}/api/roadmap/create`, {
+          branch: roadmapDraft.branch,
+          state: roadmapDraft.state,
+          employment_status: roadmapDraft.employmentStatus,
+          disability_status: roadmapDraft.disabilityStatus,
+          primary_interest: roadmapDraft.primaryInterest,
+        }, { withCredentials: true });
+        roadmap = data.roadmap;
+        setSavedRoadmap(roadmap);
+        trackEvent('roadmap_created', { source: 'floating_widget' });
+      } else {
+        roadmap = buildVeteranRoadmap(roadmapDraft);
+      }
+
       setMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          text: 'Your free Veteran Roadmap is ready. Use it as an educational starting point and verify details with official, qualified, or accredited sources when needed.',
+          text: isAuthenticated
+            ? 'Your free Veteran Roadmap is saved. Use it as an educational starting point and verify details with official, qualified, or accredited sources when needed.'
+            : 'Your free Veteran Roadmap is ready for this session. Sign in to save progress across visits.',
           roadmap,
           category: 'roadmap',
         },
@@ -543,8 +638,7 @@ export default function VeteranSuccessAssistant() {
       setLeadOffered(true);
       trackEvent('assistant_roadmap_generated', {
         source: 'floating_widget',
-        primary_interest: roadmapDraft.primaryInterest,
-        has_state: Boolean(roadmapDraft.state),
+        saved: Boolean(isAuthenticated),
       });
     } catch {
       setRoadmapError('Roadmap generation failed. Please try again.');
@@ -661,6 +755,12 @@ export default function VeteranSuccessAssistant() {
                 </button>
               ))}
             </div>
+            {roadmapFetchState === 'loading' && (
+              <p className="mt-2 text-xs text-muted-foreground">Checking for your saved roadmap...</p>
+            )}
+            {roadmapFetchState === 'error' && (
+              <p className="mt-2 text-xs text-red-600">Saved roadmap lookup is unavailable. You can still browse resources.</p>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
