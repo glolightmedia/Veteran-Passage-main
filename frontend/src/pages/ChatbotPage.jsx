@@ -1,19 +1,42 @@
 import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Bot, Send, Plus, MessageSquare, Loader2, User } from 'lucide-react';
+import { Banknote, Bot, Briefcase, Building2, GraduationCap, Home, Landmark, Loader2, MessageSquare, Plus, Scale, Send, User } from 'lucide-react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { useAuth } from '@/context/AuthContext';
 import { getDischargeTier, triageTiers } from '@/data/dischargeTypes';
 import { PageSEO } from '@/components/SEO';
+import { trackEvent } from '@/utils/analytics';
 import { toast } from 'sonner';
 import axios from 'axios';
 
 const API = process.env.REACT_APP_BACKEND_URL;
+const SAFETY_NOTICE = 'Veterans Passage provides educational resources and is not a law firm, financial advisor, medical provider, or VA-accredited claims representative.';
+
+const suggestions = [
+  { label: 'Find My Benefits', text: 'I want to find my veteran benefits.', category: 'benefits', icon: Landmark },
+  { label: 'Find a Career Path', text: 'I want to find a veteran career path.', category: 'careers', icon: Briefcase },
+  { label: 'Start a Veteran Business', text: 'I want to start a veteran business.', category: 'business', icon: Building2 },
+  { label: 'Build Wealth', text: 'I want veteran wealth-building resources.', category: 'wealth', icon: Banknote },
+  { label: 'Education Options', text: 'I want education options and GI Bill programs.', category: 'education', icon: GraduationCap },
+  { label: 'Housing Resources', text: 'I need veteran housing resources.', category: 'housing', icon: Home },
+  { label: 'Upgrade My Discharge', text: 'I need discharge upgrade resources.', category: 'second_chance', icon: Scale },
+];
+
+const centerLinks = [
+  { label: 'Benefits', href: '/benefits' },
+  { label: 'Business', href: '/business' },
+  { label: 'Wealth', href: '/wealth' },
+  { label: 'Careers', href: '/careers' },
+  { label: 'Education', href: '/education' },
+  { label: 'Housing', href: '/housing' },
+  { label: 'Second Chance', href: '/second-chance' },
+];
 
 export default function ChatbotPage() {
   const { user } = useAuth();
@@ -82,6 +105,7 @@ export default function ChatbotPage() {
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setSending(true);
+    trackEvent('chat_message_sent', { source: 'chat_page' });
 
     try {
       const { data } = await axios.post(
@@ -97,15 +121,6 @@ export default function ChatbotPage() {
     }
     setSending(false);
   };
-
-  const suggestions = [
-    { text: 'What benefits am I eligible for?', icon: '🎯' },
-    { text: 'How do I upgrade my discharge?', icon: '📋' },
-    { text: 'Find me a job program', icon: '💼' },
-    { text: 'I need mental health support', icon: '💚' },
-    { text: 'Help me start a business', icon: '🚀' },
-    { text: 'What does my RE code mean?', icon: '🔍' },
-  ];
 
   return (
     <DashboardLayout>
@@ -154,13 +169,17 @@ export default function ChatbotPage() {
                   <Bot className="w-4 h-4 text-white" />
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-foreground">Veteran Passage AI</p>
-                  <p className="text-[10px] text-muted-foreground">Powered by GPT-5.2</p>
+                  <p className="text-sm font-bold text-foreground">Veteran Success Assistant</p>
+                  <p className="text-[10px] text-muted-foreground">Benefits, careers, business, housing, education, and second chances</p>
                 </div>
               </div>
               {tierInfo && (
                 <Badge className={`${tierInfo.bgColor} ${tierInfo.color} border-0 rounded-full text-xs`}>{tierInfo.label}</Badge>
               )}
+            </div>
+
+            <div className="px-4 py-2 bg-amber-50 border-b text-xs text-amber-900 leading-relaxed">
+              {SAFETY_NOTICE}
             </div>
 
             {/* Messages */}
@@ -172,24 +191,39 @@ export default function ChatbotPage() {
                   </div>
                   <h3 className="text-lg font-bold text-foreground mb-1">How can I help you today?</h3>
                   <p className="text-sm text-muted-foreground mb-6 max-w-md">
-                    Ask me anything about veteran benefits, discharge upgrades, career paths, or support resources.
+                    Choose a quick start or ask for help finding the right Veterans Passage resource.
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-lg">
-                    {suggestions.map((s, i) => (
-                      <button
-                        key={i}
-                        onClick={() => { setInput(s.text); }}
-                        className="p-3 text-sm text-left border-2 rounded-xl hover:border-secondary/40 hover:bg-secondary/5 transition-all text-foreground font-medium flex items-center gap-2"
-                        data-testid={`suggestion-${i}`}
+                    {suggestions.map((s, i) => {
+                      const Icon = s.icon;
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => {
+                            setInput(s.text);
+                            trackEvent('assistant_prompt_selected', { prompt: s.label, category: s.category, source: 'chat_page' });
+                          }}
+                          className="p-3 text-sm text-left border-2 rounded-xl hover:border-secondary/40 hover:bg-secondary/5 transition-all text-foreground font-medium flex items-center gap-2"
+                          data-testid={`suggestion-${i}`}
+                        >
+                          <Icon className="w-4 h-4 text-secondary shrink-0" />
+                          {s.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex flex-wrap justify-center gap-2 mt-5 max-w-xl">
+                    {centerLinks.map(link => (
+                      <Link
+                        key={link.href}
+                        to={link.href}
+                        onClick={() => trackEvent('assistant_cta_click', { source: 'chat_page', cta: 'center_link', href: link.href })}
+                        className="text-xs font-semibold rounded-full border px-3 py-1.5 hover:border-secondary/40 hover:bg-secondary/5"
                       >
-                        <span className="text-lg">{s.icon}</span>
-                        {s.text}
-                      </button>
+                        {link.label}
+                      </Link>
                     ))}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-4">
-                    This assistant only answers questions about veteran benefits, services, and the Veteran Passage platform.
-                  </p>
                 </div>
               ) : (
                 <div className="space-y-4">

@@ -5,7 +5,9 @@ let eventQueue = [];
 let flushTimer = null;
 
 export function trackEvent(event, properties = {}) {
-  const route = window.location.pathname;
+  if (typeof window === 'undefined') return;
+
+  const route = window.location?.pathname || '';
   eventQueue.push({
     event,
     properties: { ...properties, route },

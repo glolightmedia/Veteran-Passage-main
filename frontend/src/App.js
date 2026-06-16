@@ -25,6 +25,8 @@ import BarterPage from '@/pages/BarterPage';
 import PartnersPage from '@/pages/PartnersPage';
 import BlogHomePage from '@/pages/BlogHomePage';
 import BlogArticlePage from '@/pages/BlogArticlePage';
+import PathwayLandingPage from '@/pages/PathwayLandingPage';
+import VeteranSuccessAssistant from '@/components/VeteranSuccessAssistant';
 // Admin
 import SuperAdminPage from '@/pages/admin/SuperAdminPage';
 import AdminUsers from '@/pages/admin/AdminUsers';
@@ -38,6 +40,16 @@ import ProviderPromotions from '@/pages/provider/ProviderPromotions';
 import DeveloperConsole from '@/pages/developer/DeveloperConsole';
 import DeveloperDocs from '@/pages/developer/DeveloperDocs';
 import { Toaster } from '@/components/ui/sonner';
+
+const ROLE_ALIASES = {
+  customer: 'veteran',
+  provider: 'partner',
+  moderator: 'content_manager',
+};
+
+function normalizeRole(role) {
+  return ROLE_ALIASES[role] || role;
+}
 
 function LoadingScreen() {
   return (
@@ -61,9 +73,11 @@ function RoleRoute({ roles, children }) {
   const { user, loading } = useAuth();
   if (loading) return <LoadingScreen />;
   if (!user || user === false) return <Navigate to="/login" />;
+  const userRole = normalizeRole(user.role);
+  const allowedRoles = roles.map(normalizeRole);
   // superadmin accesses everything
-  if (user.role === 'superadmin') return children;
-  if (!roles.includes(user.role)) return <Navigate to="/dashboard" />;
+  if (userRole === 'superadmin') return children;
+  if (!allowedRoles.includes(userRole)) return <Navigate to="/dashboard" />;
   return children;
 }
 
@@ -94,10 +108,17 @@ function AppRoutes() {
         <Route path="/partners" element={<PartnersPage />} />
         <Route path="/blog" element={<BlogHomePage />} />
         <Route path="/blog/:slug" element={<BlogArticlePage />} />
+        <Route path="/benefits" element={<PathwayLandingPage pageKey="benefits" />} />
+        <Route path="/careers" element={<PathwayLandingPage pageKey="careers" />} />
+        <Route path="/business" element={<PathwayLandingPage pageKey="business" />} />
+        <Route path="/education" element={<PathwayLandingPage pageKey="education" />} />
+        <Route path="/housing" element={<PathwayLandingPage pageKey="housing" />} />
+        <Route path="/wealth" element={<PathwayLandingPage pageKey="wealth" />} />
+        <Route path="/second-chance" element={<PathwayLandingPage pageKey="secondChance" />} />
         <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
         <Route path="/signup" element={<PublicRoute><SignupPage /></PublicRoute>} />
 
-        {/* Customer (all authenticated users) */}
+        {/* Veteran (all authenticated users) */}
         <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
         <Route path="/intake" element={<ProtectedRoute><IntakePage /></ProtectedRoute>} />
         <Route path="/navigator" element={<ProtectedRoute><NavigatorPage /></ProtectedRoute>} />
@@ -115,10 +136,13 @@ function AppRoutes() {
         {/* Admin */}
         <Route path="/admin" element={<RoleRoute roles={['admin']}><SuperAdminPage /></RoleRoute>} />
         <Route path="/admin/users" element={<RoleRoute roles={['admin']}><AdminUsers /></RoleRoute>} />
-        <Route path="/admin/resources" element={<RoleRoute roles={['admin']}><AdminResources /></RoleRoute>} />
-        <Route path="/admin/reports" element={<RoleRoute roles={['admin', 'moderator']}><AdminReports /></RoleRoute>} />
+        <Route path="/admin/resources" element={<RoleRoute roles={['admin', 'content_manager']}><AdminResources /></RoleRoute>} />
+        <Route path="/admin/reports" element={<RoleRoute roles={['admin', 'content_manager']}><AdminReports /></RoleRoute>} />
 
-        {/* Provider */}
+        {/* Partner */}
+        <Route path="/partner" element={<RoleRoute roles={['partner', 'admin']}><ProviderDashboard /></RoleRoute>} />
+        <Route path="/partner/listings" element={<RoleRoute roles={['partner', 'admin']}><ProviderListings /></RoleRoute>} />
+        <Route path="/partner/promotions" element={<RoleRoute roles={['partner', 'admin']}><ProviderPromotions /></RoleRoute>} />
         <Route path="/provider" element={<RoleRoute roles={['partner', 'admin']}><ProviderDashboard /></RoleRoute>} />
         <Route path="/provider/listings" element={<RoleRoute roles={['partner', 'admin']}><ProviderListings /></RoleRoute>} />
         <Route path="/provider/promotions" element={<RoleRoute roles={['partner', 'admin']}><ProviderPromotions /></RoleRoute>} />
@@ -140,6 +164,7 @@ function App() {
       <BrowserRouter>
         <AuthProvider>
           <AppRoutes />
+          <VeteranSuccessAssistant />
           <Toaster position="top-right" richColors />
         </AuthProvider>
       </BrowserRouter>

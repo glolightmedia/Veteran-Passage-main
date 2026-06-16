@@ -1,261 +1,325 @@
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Shield, Search, Briefcase, BookOpen, Heart, ArrowRight, CheckCircle, Users, Star, Play } from 'lucide-react';
+import {
+  ArrowRight,
+  BadgeCheck,
+  Banknote,
+  BookOpen,
+  Briefcase,
+  Building2,
+  CheckCircle,
+  GraduationCap,
+  Handshake,
+  Home,
+  Landmark,
+  Scale,
+  Search,
+  Shield,
+  Sparkles,
+  TrendingUp,
+  Users,
+} from 'lucide-react';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
-import { PageSEO, OrganizationSchema } from '@/components/SEO';
-import { LeadCaptureButton } from '@/components/LeadCaptureButton';
+import { PageSEO, OrganizationSchema, FAQSchema } from '@/components/SEO';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { trackEvent } from '@/utils/analytics';
 
-const fadeIn = { initial: { opacity: 0, y: 25 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true }, transition: { duration: 0.5 } };
+const trustSignals = [
+  'Veteran-Focused Platform',
+  '100% Free Resources',
+  'Built For Veterans & Families',
+  'New Opportunities Added Regularly',
+];
+
+const authorityStatements = [
+  'Built to simplify the transition after service',
+  'Focused on benefits, careers, business, housing, education, and financial freedom',
+  'Designed to help veterans find the next best step',
+];
+
+const pathways = [
+  {
+    icon: Shield,
+    title: 'Benefits Navigator',
+    copy: 'Use a veteran benefits guide to explore VA benefits, PACT Act support, GI Bill options, and VR&E resources.',
+    cta: 'Explore Benefits',
+    href: '/benefits',
+  },
+  {
+    icon: Briefcase,
+    title: 'Career Center',
+    copy: 'Find veteran career resources, veteran-friendly employers, remote jobs for veterans, and practical transition support.',
+    cta: 'Find Careers',
+    href: '/careers',
+  },
+  {
+    icon: Building2,
+    title: 'Business Launch Center',
+    copy: 'Explore veteran business resources, veteran entrepreneur resources, startup funding, and veteran business grants.',
+    cta: 'Start a Business',
+    href: '/business',
+  },
+  {
+    icon: Scale,
+    title: 'Second Chance Center',
+    copy: 'Find discharge upgrade resources, veteran legal assistance, benefits restoration guidance, and second-chance support.',
+    cta: 'Explore Second Chance Resources',
+    href: '/second-chance',
+  },
+  {
+    icon: TrendingUp,
+    title: 'Wealth Building Center',
+    copy: 'Learn about veteran financial freedom, VA loan investing, GI Bill high-paying careers, and long-term wealth paths.',
+    cta: 'Build Wealth',
+    href: '/wealth',
+  },
+];
+
+const internalLinks = [
+  { label: 'Benefits', href: '/benefits', icon: Landmark },
+  { label: 'Careers', href: '/careers', icon: Briefcase },
+  { label: 'Business', href: '/business', icon: Building2 },
+  { label: 'Education', href: '/education', icon: GraduationCap },
+  { label: 'Housing', href: '/housing', icon: Home },
+  { label: 'Wealth', href: '/wealth', icon: Banknote },
+  { label: 'Second Chance', href: '/second-chance', icon: Scale },
+  { label: 'Blog', href: '/blog', icon: BookOpen },
+];
+
+const faqs = [
+  {
+    question: 'What veteran benefits am I eligible for?',
+    answer: 'Eligibility depends on your service history, discharge type, disability rating, education goals, location, and current needs. Veterans Passage helps organize veteran benefits guide resources so you can find relevant next steps.',
+  },
+  {
+    question: 'How do I find veteran resources near me?',
+    answer: 'Start with your top need, such as benefits, career support, housing, education, legal help, or business resources. Then use Veterans Passage pathways and resource listings to narrow options by category.',
+  },
+  {
+    question: 'Can veterans get business grants?',
+    answer: 'Some veterans may qualify for grants, training, pitch competitions, nonprofit support, or local startup programs. Veterans Passage highlights veteran entrepreneur resources and funding paths to research.',
+  },
+  {
+    question: 'What are the best careers for veterans after military service?',
+    answer: 'Strong options often include skilled trades, logistics, cybersecurity, healthcare, project management, government roles, and veteran-friendly employers that value military experience.',
+  },
+  {
+    question: 'Can I use the GI Bill for high-paying career training?',
+    answer: 'The GI Bill may support approved education and training programs, including some technical and career-focused paths. Always verify program approval and benefit fit before enrolling.',
+  },
+  {
+    question: 'Can veterans use a VA loan to build wealth?',
+    answer: 'A VA loan can help eligible veterans buy a home with favorable terms. Some veterans use homeownership as part of a long-term financial plan, but decisions should be based on affordability and risk.',
+  },
+  {
+    question: 'How do I upgrade my military discharge?',
+    answer: 'A discharge upgrade usually requires documentation, a clear argument, and filing with the correct review board. Veterans Passage points veterans toward legal assistance and discharge upgrade resources.',
+  },
+  {
+    question: 'Is Veterans Passage free to use?',
+    answer: 'Yes. Veterans Passage is designed as a free veteran success platform for veterans and families looking for resources, guidance, and opportunity pathways.',
+  },
+];
+
+function HeroVisual() {
+  const items = [
+    { icon: Landmark, label: 'Benefits' },
+    { icon: Briefcase, label: 'Careers' },
+    { icon: Building2, label: 'Business' },
+    { icon: Home, label: 'Housing' },
+    { icon: GraduationCap, label: 'Education' },
+    { icon: TrendingUp, label: 'Wealth' },
+  ];
+
+  return (
+    <div className="relative rounded-2xl border bg-background shadow-xl overflow-hidden" aria-label="Veteran opportunity pathways visual">
+      <div className="absolute inset-x-0 top-0 h-2 bg-gradient-to-r from-secondary via-accent to-green-600" />
+      <div className="p-6 sm:p-8">
+        <div className="flex items-center gap-4 mb-8">
+          <div className="w-16 h-16 rounded-2xl bg-secondary/10 flex items-center justify-center">
+            <img src="/logo.png" alt="Veterans Passage logo" className="w-12 h-12 object-contain" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-secondary">Veterans Passage</p>
+            <p className="text-2xl font-bold text-foreground">Opportunity Pathways</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          {items.map((item) => (
+            <div key={item.label} className="rounded-xl border bg-muted/30 p-4 min-h-[92px]">
+              <item.icon className="w-6 h-6 text-secondary mb-3" />
+              <p className="text-sm font-semibold text-foreground">{item.label}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-6 rounded-xl bg-secondary/10 p-4 flex items-start gap-3">
+          <Search className="w-5 h-5 text-secondary mt-0.5 shrink-0" />
+          <p className="text-sm text-foreground">
+            One place to explore veteran assistance programs and move toward your next best step.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen" data-testid="landing-page">
+    <div className="min-h-screen bg-background" data-testid="landing-page">
       <PageSEO path="/" />
       <OrganizationSchema />
+      <FAQSchema faqs={faqs} />
       <Navigation />
 
-      {/* ═══ SECTION 1: HERO ═══ */}
-      <section className="relative pt-16 pb-20 overflow-hidden" data-testid="hero-section">
-        <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-background to-secondary/8" />
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-              <h1 className="text-4xl sm:text-5xl lg:text-[3.4rem] font-bold text-foreground leading-[1.1] mb-6">
-                Find Out What You<br />Actually Qualify For<br /><span className="text-gradient">as a Veteran</span>
+      <section className="relative overflow-hidden border-b bg-gradient-to-br from-background via-muted/20 to-secondary/5" data-testid="hero-section">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20">
+          <div className="grid lg:grid-cols-[1.05fr_0.95fr] gap-10 lg:gap-14 items-center">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border bg-background px-4 py-2 text-sm font-semibold text-secondary mb-6">
+                <Sparkles className="w-4 h-4" />
+                Free veteran resources for life after service
+              </div>
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight text-foreground max-w-4xl">
+                Discover Veteran Benefits, Careers, Business Opportunities & Wealth-Building Resources
               </h1>
-              <p className="text-lg text-muted-foreground mb-6 max-w-lg">
-                Clear answers, real opportunities, and a path forward — no matter your situation.
+              <p className="mt-6 text-lg sm:text-xl text-muted-foreground max-w-2xl leading-relaxed">
+                Veterans Passage helps veterans and their families find benefits, employment opportunities, education programs, business resources, housing solutions, and financial freedom strategies - all in one place.
               </p>
-              <ul className="space-y-2.5 mb-8">
-                {[
-                  'See what you qualify for right now',
-                  'Find jobs and resources that actually fit',
-                  'Get help without confusion or dead ends',
-                ].map((t, i) => (
-                  <li key={i} className="flex items-center gap-2.5 text-sm text-foreground">
-                    <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />{t}
-                  </li>
-                ))}
-              </ul>
-              <div className="flex flex-col sm:flex-row gap-3 mb-6">
-                <Button asChild size="lg" className="rounded-full text-base px-8 bg-secondary hover:bg-secondary/90 shadow-lg h-13 font-bold" data-testid="hero-cta-primary" onClick={() => trackEvent('hero_cta_click', { cta: 'start_passage' })}>
-                  <Link to="/signup">Start Your Passage Now <ArrowRight className="w-4 h-4 ml-2" /></Link>
+              <div className="mt-8 flex flex-col sm:flex-row gap-3">
+                <Button asChild size="lg" className="rounded-full bg-secondary hover:bg-secondary/90 h-12 px-7 text-base font-bold" onClick={() => trackEvent('hero_cta_click', { cta: 'explore_free_resources' })}>
+                  <a href="#pathways">Explore Free Resources <ArrowRight className="w-4 h-4 ml-2" /></a>
                 </Button>
-                <Button asChild variant="outline" size="lg" className="rounded-full text-base px-8 border-2 h-13" data-testid="hero-cta-decoder" onClick={() => trackEvent('hero_cta_click', { cta: 'decoder' })}>
-                  <Link to="/dd214">Use DD-214 Decoder</Link>
+                <Button asChild variant="outline" size="lg" className="rounded-full h-12 px-7 text-base font-bold border-2" onClick={() => trackEvent('hero_cta_click', { cta: 'get_veteran_updates' })}>
+                  <Link to="/signup">Get Veteran Updates</Link>
                 </Button>
               </div>
-              {/* Trust strip */}
-              <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1"><Shield className="w-3.5 h-3.5 text-secondary" /> Built by a Marine Corps Veteran</span>
-                <span className="flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5 text-green-600" /> Designed for all discharge types</span>
-                <span className="flex items-center gap-1"><Heart className="w-3.5 h-3.5 text-rose-500" /> No cost to use</span>
-              </div>
-            </motion.div>
-
-            {/* Right — Video-ready placeholder */}
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.7, delay: 0.2 }} className="hidden lg:block">
-              <div className="relative rounded-3xl overflow-hidden aspect-video bg-gradient-to-br from-secondary/10 to-accent/10 border-2 border-border shadow-xl flex items-center justify-center" data-testid="hero-media">
-                <img src="/logo.png" alt="Veteran Passage" className="w-32 h-32 object-contain opacity-30" />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-16 h-16 rounded-full bg-secondary/20 flex items-center justify-center cursor-pointer hover:bg-secondary/30 transition-all">
-                    <Play className="w-7 h-7 text-secondary ml-1" />
+              <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl">
+                {trustSignals.map((signal) => (
+                  <div key={signal} className="flex items-center gap-2 rounded-xl border bg-background/80 px-4 py-3 text-sm font-semibold text-foreground">
+                    <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
+                    {signal}
                   </div>
-                </div>
-                <p className="absolute bottom-4 text-xs text-muted-foreground">Video coming soon</p>
+                ))}
               </div>
-            </motion.div>
+            </div>
+            <HeroVisual />
           </div>
         </div>
       </section>
 
-      {/* ═══ SECTION 2: PROBLEM ═══ */}
-      <section className="py-16 bg-muted/30" data-testid="problem-section">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-3xl">
-          <motion.div {...fadeIn} className="text-center">
-            <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-5">Most Veterans Don't Get Clear Answers After Service</h2>
-            <p className="text-base text-muted-foreground mb-8 max-w-2xl mx-auto">
-              There's no roadmap after discharge. The systems are confusing. Benefits feel impossible to navigate. And most resources assume you have an honorable discharge.
-            </p>
-            <div className="grid sm:grid-cols-3 gap-4 mb-8">
-              {[
-                '"I don\'t know what I qualify for"',
-                '"I don\'t know where to start"',
-                '"I feel like I\'m missing opportunities"',
-              ].map((q, i) => (
-                <div key={i} className="p-4 border rounded-2xl bg-background text-center">
-                  <p className="text-sm text-foreground italic">{q}</p>
-                </div>
-              ))}
-            </div>
-            <Button asChild size="lg" className="rounded-full bg-secondary hover:bg-secondary/90 px-8 font-bold" onClick={() => trackEvent('section_cta_click', { section: 'problem' })}>
-              <Link to="/signup">Get Clear Answers Now <ArrowRight className="w-4 h-4 ml-2" /></Link>
-            </Button>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ═══ SECTION 3: FOUNDER STORY ═══ */}
-      <section className="py-16" data-testid="founder-section">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-3xl">
-          <motion.div {...fadeIn} className="text-center">
-            <span className="text-xs font-semibold uppercase tracking-widest text-secondary mb-4 block">Built by Someone Who Lived It</span>
-            <div className="space-y-4 text-base text-muted-foreground leading-relaxed text-left">
-              <p>
-                I served in the Marine Corps. I deployed to Fallujah. When I came home, I thought the hard part was over.
-              </p>
-              <p>
-                It wasn't. I had an Other Than Honorable discharge, and suddenly every door seemed closed. I didn't know what I qualified for. I didn't know where to start. I felt invisible.
-              </p>
-              <p>
-                It took me years to figure out what was available — programs that existed all along, opportunities I never knew about, legal rights no one told me I had.
-              </p>
-              <p className="text-foreground font-medium">
-                I built Veteran Passage so no veteran has to go through that alone. This platform gives you the clarity, direction, and support that I wish I'd had from day one.
-              </p>
-              <p className="text-sm text-muted-foreground italic">
-                — Shawn, Founder of Veteran Passage & Marine Corps Veteran
-              </p>
-            </div>
-            <Button asChild size="lg" className="rounded-full bg-secondary hover:bg-secondary/90 px-8 font-bold mt-8" onClick={() => trackEvent('section_cta_click', { section: 'founder' })}>
-              <Link to="/signup">Start Your Passage Now <ArrowRight className="w-4 h-4 ml-2" /></Link>
-            </Button>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ═══ SECTION 4: SOLUTION ═══ */}
-      <section className="py-16 bg-gradient-to-br from-secondary/3 to-accent/3" data-testid="solution-section">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl">
-          <motion.div {...fadeIn} className="text-center mb-10">
-            <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-3">A Clear Path Forward — No Matter Where You're Starting</h2>
-          </motion.div>
-          <div className="grid md:grid-cols-3 gap-6">
-            {[
-              { icon: Search, title: 'See What You Qualify For', desc: 'Understand your real options instantly based on your discharge and situation.' },
-              { icon: Briefcase, title: 'Find Real Opportunities', desc: 'Jobs, resources, and paths that actually fit you — not generic listings.' },
-              { icon: ArrowRight, title: 'Take Action Immediately', desc: 'No confusion. No wasted time. One clear next step.' },
-            ].map((item, i) => (
-              <motion.div key={i} {...fadeIn} transition={{ delay: i * 0.1 }}>
-                <Card className="border rounded-2xl h-full text-center hover:shadow-md transition-all">
-                  <CardContent className="p-6">
-                    <div className="w-12 h-12 rounded-xl bg-secondary/10 flex items-center justify-center mx-auto mb-4">
-                      <item.icon className="w-5 h-5 text-secondary" />
-                    </div>
-                    <h3 className="text-lg font-bold text-foreground mb-2">{item.title}</h3>
-                    <p className="text-sm text-muted-foreground">{item.desc}</p>
-                  </CardContent>
-                </Card>
-              </motion.div>
+      <section className="py-12 sm:py-16" data-testid="authority-section">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid md:grid-cols-3 gap-4">
+            {authorityStatements.map((statement) => (
+              <Card key={statement} className="border rounded-lg shadow-none">
+                <CardContent className="p-5 flex items-start gap-3">
+                  <BadgeCheck className="w-5 h-5 text-secondary shrink-0 mt-0.5" />
+                  <p className="text-sm font-semibold text-foreground">{statement}</p>
+                </CardContent>
+              </Card>
             ))}
           </div>
-          <div className="text-center mt-8">
-            <Button asChild size="lg" className="rounded-full bg-secondary hover:bg-secondary/90 px-8 font-bold" onClick={() => trackEvent('section_cta_click', { section: 'solution' })}>
-              <Link to="/signup">Find Your Next Step <ArrowRight className="w-4 h-4 ml-2" /></Link>
-            </Button>
-          </div>
         </div>
       </section>
 
-      {/* ═══ SECTION 5: CORE TOOLS ═══ */}
-      <section className="py-16" data-testid="tools-section">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl">
-          <motion.div {...fadeIn} className="text-center mb-10">
-            <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-3">Tools Built to Give You Real Answers</h2>
-          </motion.div>
-          <div className="grid md:grid-cols-3 gap-5">
-            {[
-              { icon: Shield, title: 'DD-214 Decoder', desc: 'Understand your discharge and what it means for your future.', cta: 'Use Decoder', href: '/dd214' },
-              { icon: Briefcase, title: 'Job Matching', desc: 'Find jobs you can realistically get — personalized to you.', cta: 'See Jobs', href: '/jobs' },
-              { icon: BookOpen, title: 'Resource Navigator', desc: 'Discover benefits and support you actually qualify for.', cta: 'Explore Resources', href: '/resources' },
-            ].map((tool, i) => (
-              <motion.div key={i} {...fadeIn} transition={{ delay: i * 0.1 }}>
-                <Link to={tool.href} onClick={() => trackEvent('tool_card_click', { tool: tool.title })}>
-                  <Card className="border rounded-2xl h-full hover:shadow-lg hover:border-secondary/30 transition-all cursor-pointer group">
-                    <CardContent className="p-6">
-                      <div className="w-11 h-11 rounded-xl bg-secondary/10 flex items-center justify-center mb-4 group-hover:bg-secondary/15 transition-colors">
-                        <tool.icon className="w-5 h-5 text-secondary" />
-                      </div>
-                      <h3 className="text-base font-bold text-foreground mb-1.5">{tool.title}</h3>
-                      <p className="text-sm text-muted-foreground mb-3">{tool.desc}</p>
-                      <span className="text-sm text-secondary font-semibold flex items-center gap-1 group-hover:gap-2 transition-all">{tool.cta} <ArrowRight className="w-3.5 h-3.5" /></span>
-                    </CardContent>
-                  </Card>
+      <section id="pathways" className="py-14 sm:py-20 bg-muted/30" data-testid="pathways-section">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-3xl mb-10">
+            <p className="text-sm font-semibold uppercase tracking-widest text-secondary mb-3">Veteran Resource Pathways</p>
+            <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">Find the right veteran assistance programs faster</h2>
+            <p className="text-base sm:text-lg text-muted-foreground">
+              Choose the pathway that matches your goal: get more benefits, find better work, launch a business, rebuild after setbacks, or build wealth.
+            </p>
+          </div>
+          <div className="grid md:grid-cols-2 xl:grid-cols-5 gap-4">
+            {pathways.map((pathway) => (
+              <Card key={pathway.title} className="rounded-lg border bg-background h-full shadow-none hover:shadow-md transition-shadow">
+                <CardContent className="p-5 flex flex-col h-full">
+                  <div className="w-11 h-11 rounded-lg bg-secondary/10 flex items-center justify-center mb-4">
+                    <pathway.icon className="w-5 h-5 text-secondary" />
+                  </div>
+                  <h3 className="text-lg font-bold text-foreground mb-3">{pathway.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed flex-1">{pathway.copy}</p>
+                  <Button asChild variant="link" className="justify-start px-0 mt-5 text-secondary font-bold" onClick={() => trackEvent('pathway_click', { pathway: pathway.title })}>
+                    <Link to={pathway.href}>{pathway.cta} <ArrowRight className="w-4 h-4 ml-1" /></Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <div className="mt-8 flex flex-wrap gap-3">
+            {internalLinks.map((link) => (
+              <Button key={link.href} asChild variant="outline" className="rounded-full bg-background">
+                <Link to={link.href}>
+                  <link.icon className="w-4 h-4 mr-2" />
+                  {link.label}
                 </Link>
-              </motion.div>
+              </Button>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ═══ SECTION 6: CONVERSION ═══ */}
-      <section className="py-14 bg-muted/30" data-testid="conversion-section">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-2xl text-center">
-          <motion.div {...fadeIn}>
-            <Heart className="w-10 h-10 text-secondary mx-auto mb-4" />
-            <h2 className="text-3xl font-bold text-foreground mb-3">You Don't Have to Figure This Out Alone</h2>
-            <p className="text-base text-muted-foreground mb-6">
-              Whether you need legal help, job support, or just someone to point you in the right direction — we're here.
-            </p>
-            <LeadCaptureButton category="general" resourceName="Landing Page Help Request" label="Get Help Now" variant="default" className="bg-secondary hover:bg-secondary/90 text-white rounded-full px-8 h-12 text-base font-bold" />
-            <p className="text-xs text-muted-foreground mt-3">We'll help you understand your next step</p>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ═══ SECTION 7: SOCIAL PROOF ═══ */}
-      <section className="py-16" data-testid="proof-section">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl">
-          <motion.div {...fadeIn} className="text-center mb-10">
-            <h2 className="text-3xl font-bold text-foreground mb-3">Veterans Are Finding Their Path Forward</h2>
-          </motion.div>
-          <div className="grid md:grid-cols-3 gap-5">
-            {[
-              { name: 'James R.', branch: 'Army Veteran', quote: 'I had no idea I could upgrade my discharge until I found this. The decoder showed me exactly what to do.' },
-              { name: 'Sarah M.', branch: 'Marine Corps Veteran', quote: 'Within a week of using the job board, I had two interviews. The second-chance filter changed everything.' },
-              { name: 'Michael C.', branch: 'Navy Veteran', quote: 'I was drowning in confusion. Veteran Passage gave me a clear next step and connected me with legal help.' },
-            ].map((t, i) => (
-              <motion.div key={i} {...fadeIn} transition={{ delay: i * 0.1 }}>
-                <Card className="border rounded-2xl h-full">
-                  <CardContent className="p-5">
-                    <div className="text-2xl text-secondary mb-2">&ldquo;</div>
-                    <p className="text-sm text-foreground leading-relaxed italic mb-4">{t.quote}</p>
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full gradient-hero flex items-center justify-center text-white text-xs font-bold">{t.name[0]}</div>
-                      <div>
-                        <p className="text-xs font-bold text-foreground">{t.name}</p>
-                        <p className="text-[10px] text-muted-foreground">{t.branch}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ═══ SECTION 8: FINAL CTA ═══ */}
-      <section className="py-16" data-testid="final-cta-section">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-3xl">
-          <motion.div {...fadeIn}>
-            <div className="text-center rounded-3xl gradient-hero p-10 sm:p-14 text-white shadow-xl">
-              <h2 className="text-3xl sm:text-4xl font-bold mb-4">Start Your Next Chapter With Clarity</h2>
-              <p className="text-base text-white/85 mb-8 max-w-xl mx-auto">Takes less than 60 seconds to get started.</p>
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <Button asChild size="lg" className="rounded-full bg-white text-foreground hover:bg-white/90 font-bold px-8 shadow-lg" onClick={() => trackEvent('final_cta_click', { cta: 'start_passage' })}>
-                  <Link to="/signup">Start Your Passage Now</Link>
-                </Button>
-                <Button asChild variant="outline" size="lg" className="rounded-full border-white/40 text-white hover:bg-white/10 px-8" onClick={() => trackEvent('final_cta_click', { cta: 'see_qualify' })}>
-                  <Link to="/dd214">See What You Qualify For</Link>
-                </Button>
+      <section className="py-14 sm:py-20" data-testid="difference-section">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-[0.9fr_1.1fr] gap-10 items-start">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-widest text-secondary mb-3">Why Veterans Passage Is Different</p>
+              <h2 className="text-3xl sm:text-4xl font-bold text-foreground">More Than Benefits. A Roadmap To Success.</h2>
+            </div>
+            <div className="space-y-5 text-base sm:text-lg text-muted-foreground leading-relaxed">
+              <p>
+                Most veteran sites focus only on benefits or claims. Veterans Passage helps veterans move from service to long-term success through benefits, employment, education, entrepreneurship, housing, second chances, and wealth-building.
+              </p>
+              <p>
+                The goal is simple: help veterans and families understand available veteran resources, choose a practical next step, and avoid getting stuck in disconnected systems.
+              </p>
+              <div className="grid sm:grid-cols-2 gap-3 pt-2">
+                {['Veteran benefits guide', 'Veteran career resources', 'Veteran housing resources', 'Veterans transition assistance'].map((item) => (
+                  <div key={item} className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <Handshake className="w-4 h-4 text-secondary" />
+                    {item}
+                  </div>
+                ))}
               </div>
             </div>
-          </motion.div>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-14 sm:py-20 bg-muted/30" data-testid="faq-section">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">Veteran Resources FAQ</h2>
+            <p className="text-base sm:text-lg text-muted-foreground">
+              Quick answers about veteran benefits, career resources, education benefits, VA loans, business resources, and second-chance support.
+            </p>
+          </div>
+          <Accordion type="single" collapsible className="rounded-lg border bg-background px-4 sm:px-6">
+            {faqs.map((faq, index) => (
+              <AccordionItem key={faq.question} value={`faq-${index}`}>
+                <AccordionTrigger className="text-base font-bold text-foreground hover:no-underline">{faq.question}</AccordionTrigger>
+                <AccordionContent className="text-sm sm:text-base text-muted-foreground leading-relaxed">{faq.answer}</AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        </div>
+      </section>
+
+      <section className="py-14 sm:py-20" data-testid="final-cta-section">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="rounded-2xl border bg-gradient-to-br from-secondary/10 via-background to-accent/10 p-8 sm:p-12 text-center">
+            <Users className="w-10 h-10 text-secondary mx-auto mb-5" />
+            <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">Ready To Discover Your Next Opportunity?</h2>
+            <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
+              Explore free veteran resources designed to help you succeed after military service.
+            </p>
+            <Button asChild size="lg" className="rounded-full bg-secondary hover:bg-secondary/90 h-12 px-8 text-base font-bold" onClick={() => trackEvent('final_cta_click', { cta: 'get_started_free' })}>
+              <Link to="/signup">Get Started Free <ArrowRight className="w-4 h-4 ml-2" /></Link>
+            </Button>
+          </div>
         </div>
       </section>
 
